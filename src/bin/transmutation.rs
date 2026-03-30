@@ -76,7 +76,7 @@ enum Commands {
         ffi: bool,
 
         /// Image quality (1-100)
-        #[arg(short = 'q', long, default_value = "85")]
+        #[arg(short = 'Q', long, default_value = "85")]
         quality: u8,
 
         /// DPI for image output
@@ -178,20 +178,61 @@ async fn run_command(cli: Cli) -> Result<()> {
         } => {
             if !cli.quiet {
                 println!("{}", "Converting document...".cyan().bold());
-                println!("  Input:  {}", input.display());
             }
 
+            // Determine output format
+            let output_format = match format {
+                OutputFormatArg::Markdown => OutputFormat::Markdown {
+                    split_pages,
+                    optimize_for_llm: optimize_llm,
+                },
+                OutputFormatArg::Json => OutputFormat::Json {
+                    structured: true,
+                    include_metadata: true,
+                },
+                OutputFormatArg::Png => OutputFormat::Image {
+                    format: transmutation::ImageFormat::Png,
+                    quality,
+                    dpi,
+                },
+                OutputFormatArg::Jpeg => OutputFormat::Image {
+                    format: transmutation::ImageFormat::Jpeg,
+                    quality,
+                    dpi,
+                },
+                OutputFormatArg::Webp => OutputFormat::Image {
+                    format: transmutation::ImageFormat::Webp,
+                    quality,
+                    dpi,
+                },
+                OutputFormatArg::Csv => OutputFormat::Csv {
+                    delimiter: ',',
+                    include_headers: true,
+                },
+            };
+
             let output_path = output.unwrap_or_else(|| {
-                let mut path = input.clone();
-                path.set_extension(match format {
-                    OutputFormatArg::Markdown => "md",
-                    OutputFormatArg::Png => "png",
-                    OutputFormatArg::Jpeg => "jpg",
-                    OutputFormatArg::Webp => "webp",
-                    OutputFormatArg::Json => "json",
-                    OutputFormatArg::Csv => "csv",
-                });
-                path
+                if input.to_str() == Some("-") {
+                    PathBuf::from(match format {
+                        OutputFormatArg::Markdown => "output.md",
+                        OutputFormatArg::Png => "output.png",
+                        OutputFormatArg::Jpeg => "output.jpg",
+                        OutputFormatArg::Webp => "output.webp",
+                        OutputFormatArg::Json => "output.json",
+                        OutputFormatArg::Csv => "output.csv",
+                    })
+                } else {
+                    let mut path = input.clone();
+                    path.set_extension(match format {
+                        OutputFormatArg::Markdown => "md",
+                        OutputFormatArg::Png => "png",
+                        OutputFormatArg::Jpeg => "jpg",
+                        OutputFormatArg::Webp => "webp",
+                        OutputFormatArg::Json => "json",
+                        OutputFormatArg::Csv => "csv",
+                    });
+                    path
+                }
             });
 
             if !cli.quiet {
@@ -234,45 +275,73 @@ async fn run_command(cli: Cli) -> Result<()> {
                 );
             }
 
-            // Determine output format
-            let output_format = match format {
-                OutputFormatArg::Markdown => OutputFormat::Markdown {
-                    split_pages,
-                    optimize_for_llm: optimize_llm,
-                },
-                OutputFormatArg::Json => OutputFormat::Json {
-                    structured: true,
-                    include_metadata: true,
-                },
-                OutputFormatArg::Png => OutputFormat::Image {
-                    format: transmutation::ImageFormat::Png,
-                    quality,
-                    dpi,
-                },
-                OutputFormatArg::Jpeg => OutputFormat::Image {
-                    format: transmutation::ImageFormat::Jpeg,
-                    quality,
-                    dpi,
-                },
-                OutputFormatArg::Webp => OutputFormat::Image {
-                    format: transmutation::ImageFormat::Webp,
-                    quality,
-                    dpi,
-                },
-                OutputFormatArg::Csv => OutputFormat::Csv {
-                    delimiter: ',',
-                    include_headers: true,
-                },
-            };
-
             // Perform conversion
             let start = Instant::now();
+            
+            let mut _temp_file_guard = None;
+            let actual_input = if input.to_str() == Some("-") {
+                if !cli.quiet {
+                    println!("  Input:  (stdin spooled to single file)");
+                }
+                
+                use std::io::{self, Read, Write};
+                let mut stdin = io::stdin().lock();
+                
+                // Allow overriding temp dir for testing
+                let custom_temp = std::env::var("TRANSMUTATION_TEMP_DIR").ok().map(PathBuf::from);
+                if let Some(ref d) = custom_temp {
+                    std::fs::create_dir_all(d).map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                }
+                
+                let mut builder = tempfile::Builder::new();
+                builder.prefix("transmutation_pipe_");
+                
+                // If the user specified an output file extension, use it to hint the format detector
+                let ext_string = if let Some(ext) = output_path.extension().and_then(|e| e.to_str()) {
+                    format!(".{}", ext)
+                } else {
+                    ".txt".to_string()
+                };
+                builder.suffix(&ext_string);
+                
+                let mut temp_file = match custom_temp {
+                    Some(ref d) => builder.tempfile_in(d).map_err(|e| transmutation::TransmutationError::IoError(e))?,
+                    None => builder.tempfile().map_err(|e| transmutation::TransmutationError::IoError(e))?,
+                };
+                
+                if !cli.quiet {
+                    println!("  Streaming stdin to disk... (Constant RAM usage)");
+                }
+                
+                // Spool the entire stream into the single temp file
+                std::io::copy(&mut stdin, &mut temp_file).map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                temp_file.flush().map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                
+                let path = temp_file.path().to_path_buf();
+                
+                if custom_temp.is_some() {
+                     // Leak the temp file for testing purposes so the test script can inspect it
+                     let (_, path) = temp_file.keep().unwrap();
+                     path
+                } else {
+                     // Keep the guard so it deletes at the end of scope
+                     _temp_file_guard = Some(temp_file);
+                     path
+                }
+            } else {
+                if !cli.quiet {
+                    println!("  Input:  {}", input.display());
+                }
+                input.clone()
+            };
+
             let result = converter
-                .convert(&input)
+                .convert(&actual_input)
                 .to(output_format)
                 .with_options(options)
                 .execute()
                 .await?;
+                
             let duration = start.elapsed();
 
             // Save output(s) - handle multiple files for split pages or images
@@ -450,6 +519,40 @@ async fn run_command(cli: Cli) -> Result<()> {
             Ok(())
         }
     }
+}
+
+fn merge_results(mut results: Vec<transmutation::ConversionResult>) -> transmutation::Result<transmutation::ConversionResult> {
+    if results.is_empty() {
+        return Err(transmutation::TransmutationError::conversion_failed("No results to merge"));
+    }
+    
+    // Take the first result as the base
+    let mut base = results.remove(0);
+    
+    // Merge subsequent results
+    for mut result in results {
+        // Update statistics
+        base.statistics.input_size_bytes += result.statistics.input_size_bytes;
+        base.statistics.output_size_bytes += result.statistics.output_size_bytes;
+        base.statistics.duration += result.statistics.duration;
+        base.statistics.pages_processed += result.statistics.pages_processed;
+        base.statistics.tables_extracted += result.statistics.tables_extracted;
+        base.statistics.images_extracted += result.statistics.images_extracted;
+        
+        // Offset page numbers in content
+        let page_offset = base.metadata.page_count;
+        for output in &mut result.content {
+            output.page_number += page_offset;
+        }
+        
+        // Append content
+        base.content.extend(result.content);
+        
+        // Update page count in metadata
+        base.metadata.page_count += result.metadata.page_count;
+    }
+    
+    Ok(base)
 }
 
 fn get_enabled_features() -> String {
