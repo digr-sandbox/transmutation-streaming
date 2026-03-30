@@ -91,18 +91,51 @@ impl DocumentConverter for TxtConverter {
         eprintln!("   TXT → Encoding Detection → {:?}", output_format);
         eprintln!();
 
-        // Read text file with encoding detection
-        let text_content = fs::read_to_string(input).await?;
-
+        // Check file size and start reading
+        let input_size = fs::metadata(input).await?.len();
+        
         // Convert to requested format
         let output_data = match output_format {
             OutputFormat::Markdown { .. } => {
                 eprintln!("📝 Converting to Markdown...");
-                let markdown = self.txt_to_markdown(&text_content);
+                
+                let mut markdown = String::new();
+                markdown.push_str("# Document\n\n");
+                
+                use std::io::BufRead;
+                let file = std::fs::File::open(input).map_err(|e| crate::TransmutationError::IoError(e))?;
+                let reader = std::io::BufReader::new(file);
+                
+                let mut in_paragraph = false;
+                
+                for line in reader.lines() {
+                    let line = line.unwrap_or_else(|_| String::new());
+                    let trimmed = line.trim();
+                    
+                    if trimmed.is_empty() {
+                        if in_paragraph {
+                            markdown.push_str("\n\n");
+                            in_paragraph = false;
+                        }
+                    } else {
+                        if in_paragraph {
+                            markdown.push('\n'); // Preserve single newlines
+                        }
+                        markdown.push_str(trimmed);
+                        in_paragraph = true;
+                    }
+                }
+                
+                if in_paragraph {
+                    markdown.push('\n');
+                }
+
                 markdown.into_bytes()
             }
             OutputFormat::Json { .. } => {
                 eprintln!("📝 Converting to JSON...");
+                // For JSON, we read the whole file to build the structure
+                let text_content = fs::read_to_string(input).await?;
                 let json = serde_json::json!({
                     "text": {
                         "content": text_content,
@@ -121,7 +154,6 @@ impl DocumentConverter for TxtConverter {
         };
 
         let output_size = output_data.len() as u64;
-        let input_size = fs::metadata(input).await?.len();
 
         eprintln!("✅ TXT conversion complete!");
 
