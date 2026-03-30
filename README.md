@@ -84,6 +84,25 @@ See [BENCHMARK_COMPARISON.md](BENCHMARK_COMPARISON.md) for detailed results.
 | **TAR/GZ** | Extract and process contents | 🔄 Planned | - |
 | **7Z** | Extract and process contents | 🔄 Planned | - |
 
+## 🤖 Agentic Shell Proxy (Stdin Streaming)
+
+Transmutation features a highly optimized **Single Reconstructed File** streaming architecture designed specifically to sit in the pipeline between a shell and Agentic IDEs/Tools (e.g., *zeroclaw, openclaw, claude code, codex, opencode, gemini-cli, kilocode, cline, antigravity*).
+
+You can pipe infinite shell output directly into the transmuter to safely compress it for your agent's context window:
+
+```bash
+# Compress massive shell output for an agent
+cat massive_build.log | transmutation convert - --optimize-llm > compressed_context.md
+
+# Safely proxy unknown binary formats (auto-routes to correct engine)
+cat unknown_file.mp4 | transmutation convert - --output transcript.md
+```
+
+**Key Benefits for Agents:**
+- **Zero OOM Crashes:** Massive streams are spooled to disk with a constant ~8KB RAM footprint.
+- **Data Integrity:** 100% of the stream is faithfully reconstructed before being passed to the format-specific engine.
+- **OOM-Safe Text Engine:** The `TxtConverter` reads reconstructed files line-by-line, preventing memory crashes when formatting 10GB+ log files.
+
 ## 🚀 Quick Start
 
 ### Installation

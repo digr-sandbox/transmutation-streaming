@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Type | Description |
 |---------|------|------|-------------|
+| [0.4.0](#040---2026-03-30) | 2026-03-30 | **Feature** | Stdin streaming, OOM safety for Agentic Proxies |
 | [0.3.2](#032---2026-02-28) | 2026-02-28 | **Bugfix** | Fix duplicate resource & docling-ffi build errors |
 | [0.3.1](#031---2025-12-06) | 2025-12-06 | **Bugfix** | Fix UTF-8 boundary panic in PDF conversion |
 | [0.3.0](#030---2025-12-06) | 2025-12-06 | **Performance** | PDF memory optimization, cached regex |
@@ -18,6 +19,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | [0.1.2](#012---2025-10-13) | 2025-10-13 | **Major** | 27 formats, Phase 3 complete, Audio/Video transcription |
 | [0.1.1](#011---2025-10-13) | 2025-10-13 | **Distribution** | MSI installer, icons, automated scripts |
 | [0.1.0](#010---2025-10-13) | 2025-10-13 | **Initial** | Core PDF/DOCX conversion, 98x faster than Docling |
+
+---
+
+## [0.4.0] - 2026-03-30
+
+**Feature Release: Agentic Proxy Support**
+
+Introduces robust stdin streaming and OOM protections, enabling `transmutation` to serve as a high-reliability compression proxy between shell environments and Agentic IDEs/tools.
+
+### Added
+- **Stdin Streaming (`convert -`)**: Added support for reading from standard input.
+- **Single Reconstructed File Spooler**: Added a constant-memory (~8KB) spooler that safely writes massive pipes to disk before processing, protecting against OOM crashes.
+- **Heavy Pipe Stress Tests**: Added tests to guarantee data integrity across huge stream reconstructions.
+
+### Fixed
+- **TxtConverter OOM Vulnerability**: Removed `fs::read_to_string` from the plain text engine. The engine now parses text line-by-line using `BufReader`, preventing crashes on massive log files.
+- **CLI Flag Conflict**: Fixed a startup panic caused by a conflict between the global `--quiet` (`-q`) flag and the subcommand `--quality` flag. Image quality now uses `-Q`.
 
 ---
 
