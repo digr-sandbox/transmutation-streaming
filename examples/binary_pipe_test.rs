@@ -34,7 +34,8 @@ fn test_binary_stream(format_name: &str, magic_bytes: &[u8], expected_ext: &str)
     let mut child = Command::new("cargo")
         .env("TRANSMUTATION_TEMP_DIR", temp_dir.to_str().unwrap())
         // Important: We request .md output to prove the sniffer overrides the output extension hint
-        .args(["run", "--features", "cli", "--", "convert", "-", "--output", &format!("dummy_output.md"), "--quiet"])
+        // We enable 'audio' feature to ensure MP3 routing is supported
+        .args(["run", "--features", "cli,audio", "--", "convert", "-", "--output", &format!("dummy_output.md"), "--quiet"])
         .stdin(Stdio::piped())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
