@@ -224,28 +224,32 @@ fn offload_to_sqlite(record: &AuditLogRecord) -> TransResult<()> {
         .map(|p| p.join(".transmutation"))
         .unwrap_or_else(|| PathBuf::from("."));
     let db_path = db_dir.join("audit.db");
+let conn = rusqlite::Connection::open(&db_path)
+    .map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Connection failed", e))?;
 
-    let conn = rusqlite::Connection::open(&db_path)
-        .map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Connection failed", e))?;
+// Standardize schema for v12 (No version numbers in table names)
+// First, cleanup old development tables
+let _ = conn.execute("DROP TABLE IF EXISTS audit_events_v11", []);
 
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS audit_events_v11 (
-            timestamp TEXT,
-            command TEXT,
-            exit_code INTEGER,
-            security_ms INTEGER,
-            shell_ms INTEGER,
-            proxy_ms INTEGER,
-            total_ms INTEGER,
-            input_bytes INTEGER,
-            output_bytes INTEGER
-        )",
-        [],
-    ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Table creation failed", e))?;
+conn.execute(
+    "CREATE TABLE IF NOT EXISTS audit_events (
+        timestamp TEXT,
+        command TEXT,
+        exit_code INTEGER,
+        security_ms INTEGER,
+        shell_ms INTEGER,
+        proxy_ms INTEGER,
+        total_ms INTEGER,
+        input_bytes INTEGER,
+        output_bytes INTEGER
+    )",
+    [],
+).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Table creation failed", e))?;
 
-    conn.execute(
-        "INSERT INTO audit_events_v11 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        rusqlite::params![
+conn.execute(
+    "INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    rusqlite::params![
+
             record.timestamp.to_rfc3339(),
             record.command,
             record.exit_code,
