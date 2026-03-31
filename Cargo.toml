@@ -127,6 +127,9 @@ num_cpus = "1.16"
 
 # System directories
 dirs = "5.0"
+sysinfo = "0.33"
+zstd = "0.13"
+chrono = { version = "0.4", features = ["serde"] }
 
 # CLI dependencies
 clap = { version = "4.5", features = ["derive", "cargo", "env"], optional = true }
