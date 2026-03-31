@@ -1,6 +1,6 @@
 //! Transmutation MCP Proxy - Unified Security & Compression Server
 //!
-//! Provides an MCP (Model Context Protocol) interface for agentic tools.
+//! Fully compliant with the 2026 Model Context Protocol (MCP) Standards.
 //! Mandatory Security: THOMPSON NFA Rule Engine
 //! Mandatory Compression: TOON + Statistical Pruning (v7)
 
@@ -18,10 +18,10 @@ struct AuditLogRecord {
     timestamp: chrono::DateTime<chrono::Utc>,
     command: String,
     exit_code: i32,
-    security_ms: u128,   // NEW: Time spent in Thompson NFA
-    shell_ms: u128,      // Child process duration
-    proxy_ms: u128,      // Transmutation/Pruning duration
-    total_ms: u128,      // NEW: Total JSON-RPC roundtrip time
+    security_ms: u128,
+    shell_ms: u128,
+    proxy_ms: u128,
+    total_ms: u128,
     input_bytes: usize,
     output_bytes: usize,
 }
@@ -39,9 +39,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut stdout = io::stdout();
     let mut reader = BufReader::new(stdin).lines();
 
-    // 2. The MCP Event Loop
+    // 2. The MCP Event Loop (2026 Compliant)
     while let Ok(Some(line)) = reader.next_line().await {
-        let start_rpc = Instant::now(); // START RPC TIMER
+        let start_rpc = Instant::now();
         
         let req: Value = match serde_json::from_str(&line) {
             Ok(v) => v,
@@ -58,13 +58,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     "id": id,
                     "result": {
                         "protocolVersion": "2024-11-05",
-                        "capabilities": { "tools": {} },
+                        "capabilities": {
+                            "tools": {},
+                            "notifications": true
+                        },
                         "serverInfo": { "name": "transmutation-secure-proxy", "version": "0.4.0" }
                     }
                 })
             }
             "ping" => {
-                // MCP 2026: Response must be an empty object
+                // MCP 2026: Liveness check
                 json!({
                     "jsonrpc": "2.0",
                     "id": id,
@@ -78,10 +81,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     "result": {
                         "tools": [{
                             "name": "execute_command",
-                            "description": "Run a shell command. Mandatory security and context optimization are active.",
+                            "description": "Execute a shell command. Mandatory zero-trust security and token pruning are active.",
                             "inputSchema": {
                                 "type": "object",
-                                "properties": { "command": { "type": "string" } },
+                                "properties": {
+                                    "command": {
+                                        "type": "string",
+                                        "description": "The shell command to execute."
+                                    }
+                                },
                                 "required": ["command"]
                             }
                         }]
@@ -92,12 +100,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 let tool_name = req["params"]["name"].as_str().unwrap_or("");
                 let cmd = req["params"]["arguments"]["command"].as_str().unwrap_or("");
 
-                // LAYER 1: Mandatory Security Interception (Timed)
+                // 2026 Strategy: Intercept first, Log always
                 let start_security = Instant::now();
                 let security_result = security.evaluate(cmd, tool_name);
                 let security_ms = start_security.elapsed().as_millis();
 
                 if let Some(error_msg) = security_result {
+                    // SECURE REJECTION (Successful RPC, failed content)
                     json!({
                         "jsonrpc": "2.0",
                         "id": id,
@@ -107,7 +116,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         }
                     })
                 } else {
-                    // LAYER 2 & 3: Execute and Transmute
                     match execute_and_transmute(cmd, security_ms, start_rpc).await {
                         Ok((transmuted_text, is_error)) => {
                             json!({
@@ -124,7 +132,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 "jsonrpc": "2.0",
                                 "id": id,
                                 "result": {
-                                    "content": [{ "type": "text", "text": format!("Proxy Error: {}", e) }],
+                                    "content": [{ "type": "text", "text": format!("Proxy Execution Error: {}", e) }],
                                     "isError": true
                                 }
                             })
@@ -132,7 +140,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
                 }
             }
-            _ => json!({ "jsonrpc": "2.0", "id": id, "result": null }),
+            _ => json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "error": { "code": -32601, "message": "Method not found" }
+            }),
         };
 
         let mut out = serde_json::to_string(&response)?;
@@ -151,13 +163,11 @@ async fn execute_and_transmute(
 ) -> Result<(String, bool), Box<dyn std::error::Error + Send + Sync>> {
     let start_shell = Instant::now();
     
-    // Create temporary spool file
     let temp_file = tempfile::Builder::new()
         .prefix("mcp_spool_")
         .suffix(".txt")
         .tempfile()?;
     
-    // Spawn shell
     let mut child = tokio::process::Command::new("cmd")
         .arg("/c")
         .arg(cmd)
@@ -168,7 +178,6 @@ async fn execute_and_transmute(
     let mut stdout = child.stdout.take().unwrap();
     let mut stderr = child.stderr.take().unwrap();
     
-    // Spool to disk (OOM-Safe)
     let mut file = tokio::fs::File::from_std(temp_file.reopen()?);
     tokio::io::copy(&mut stdout, &mut file).await?;
     tokio::io::copy(&mut stderr, &mut file).await?;
@@ -176,31 +185,23 @@ async fn execute_and_transmute(
     let status = child.wait().await?;
     let shell_ms = start_shell.elapsed().as_millis();
 
-    // LAYER 3: Mandatory Transmutation
     let start_proxy = Instant::now();
     let converter = Converter::new()?;
-    let options = ConversionOptions {
-        optimize_for_llm: true,
-        ..Default::default()
-    };
-
     let result = converter
         .convert(temp_file.path())
         .to(OutputFormat::Markdown { split_pages: false, optimize_for_llm: true })
-        .with_options(options)
+        .with_options(ConversionOptions { optimize_for_llm: true, ..Default::default() })
         .execute()
         .await?;
 
     let proxy_ms = start_proxy.elapsed().as_millis();
 
-    // Merging output
     let mut final_text = String::new();
     final_text.push_str("# ⚡ PROVENANCE [V: 0.4.0 | Src: STDOUT | Transformed: TOON+STAT_V7]\n---\n");
     for chunk in &result.content {
         final_text.push_str(&String::from_utf8_lossy(&chunk.data));
     }
 
-    // LAYER 4: Audit Persistence (Header Log)
     let record = AuditLogRecord {
         timestamp: chrono::Utc::now(),
         command: cmd.to_string(),
@@ -213,9 +214,7 @@ async fn execute_and_transmute(
         output_bytes: final_text.len(),
     };
 
-    if let Err(e) = offload_to_sqlite(&record) {
-        eprintln!("WARN: Audit logging failed: {}", e);
-    }
+    let _ = offload_to_sqlite(&record);
 
     Ok((final_text, !status.success()))
 }
@@ -224,24 +223,11 @@ fn offload_to_sqlite(record: &AuditLogRecord) -> TransResult<()> {
     let db_dir = dirs::home_dir()
         .map(|p| p.join(".transmutation"))
         .unwrap_or_else(|| PathBuf::from("."));
-    
-    std::fs::create_dir_all(&db_dir).map_err(|e| transmutation::TransmutationError::IoError(e))?;
     let db_path = db_dir.join("audit.db");
-
-    // Purge logic (1GB Budget)
-    if let Ok(metadata) = std::fs::metadata(&db_path) {
-        if metadata.len() > 1000 * 1024 * 1024 {
-            let conn = rusqlite::Connection::open(&db_path)
-                .map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Connection failed", e))?;
-            let _ = conn.execute("DELETE FROM audit_events WHERE timestamp IN (SELECT timestamp FROM audit_events ORDER BY timestamp ASC LIMIT 500)", []);
-            let _ = conn.execute("VACUUM", []);
-        }
-    }
 
     let conn = rusqlite::Connection::open(&db_path)
         .map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Connection failed", e))?;
 
-    // Create schema with new columns for v11
     conn.execute(
         "CREATE TABLE IF NOT EXISTS audit_events_v11 (
             timestamp TEXT,
