@@ -107,3 +107,44 @@ impl SecurityEngine {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn get_test_engine() -> SecurityEngine {
+        let rules_json = r#"[
+            {
+                "name": "01_Global_System_Vault",
+                "logic": "t.function.arguments.matches('(?i).*(\\.bashrc|\\.zshrc|\\.pem|\\.key|credentials|shadow|passwd|id_).*')",
+                "message": "Blocked."
+            },
+            {
+                "name": "02_Config_DB_Isolation",
+                "logic": "t.function.name == 'execute_command' && t.function.arguments.matches('(?i).*(cat |grep |rg |ag |ack |less |more |vi |nano |view |edit |cp |mv |ln ).*(\\.env|config\\..*|\\.sqlite|\\.db).*')",
+                "message": "Blocked."
+            },
+            {
+                "name": "04_Timeout_Minimum_Enforcement",
+                "logic": "t.function.name == 'execute_command' && t.function.arguments.matches('(?i).*timeout\\s+([1-9]|[1-9][0-9]|[1-2][0-9][0-9])s?\\b.*')",  
+                "message": "Blocked."
+            }
+        ]"#;
+        SecurityEngine::load_from_str(rules_json).expect("Failed to parse test JSON")
+    }
+
+    #[test]
+    fn test_safe_commands_pass() {
+        let engine = get_test_engine();
+        assert!(engine.evaluate("npm install", "execute_command").is_none());
+        assert!(engine.evaluate("timeout 300s npm run build", "execute_command").is_none());
+    }
+
+    #[test]
+    fn test_blocks_malicious_commands() {
+        let engine = get_test_engine();
+        assert!(engine.evaluate("cat .env", "execute_command").is_some());
+        assert!(engine.evaluate("id_rsa", "read_file").is_some());
+        assert!(engine.evaluate("timeout 10s npm install", "execute_command").is_some());
+    }
+}

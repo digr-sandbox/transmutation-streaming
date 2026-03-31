@@ -18,8 +18,10 @@ struct AuditLogRecord {
     timestamp: chrono::DateTime<chrono::Utc>,
     command: String,
     exit_code: i32,
-    shell_ms: u128,
-    proxy_ms: u128,
+    security_ms: u128,   // NEW: Time spent in Thompson NFA
+    shell_ms: u128,      // Child process duration
+    proxy_ms: u128,      // Transmutation/Pruning duration
+    total_ms: u128,      // NEW: Total JSON-RPC roundtrip time
     input_bytes: usize,
     output_bytes: usize,
 }
@@ -39,6 +41,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // 2. The MCP Event Loop
     while let Ok(Some(line)) = reader.next_line().await {
+        let start_rpc = Instant::now(); // START RPC TIMER
+        
         let req: Value = match serde_json::from_str(&line) {
             Ok(v) => v,
             Err(_) => continue,
@@ -57,6 +61,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         "capabilities": { "tools": {} },
                         "serverInfo": { "name": "transmutation-secure-proxy", "version": "0.4.0" }
                     }
+                })
+            }
+            "ping" => {
+                // MCP 2026: Response must be an empty object
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "result": {}
                 })
             }
             "tools/list" => {
@@ -80,8 +92,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 let tool_name = req["params"]["name"].as_str().unwrap_or("");
                 let cmd = req["params"]["arguments"]["command"].as_str().unwrap_or("");
 
-                // LAYER 1: Mandatory Security Interception
-                if let Some(error_msg) = security.evaluate(cmd, tool_name) {
+                // LAYER 1: Mandatory Security Interception (Timed)
+                let start_security = Instant::now();
+                let security_result = security.evaluate(cmd, tool_name);
+                let security_ms = start_security.elapsed().as_millis();
+
+                if let Some(error_msg) = security_result {
                     json!({
                         "jsonrpc": "2.0",
                         "id": id,
@@ -92,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     })
                 } else {
                     // LAYER 2 & 3: Execute and Transmute
-                    match execute_and_transmute(cmd).await {
+                    match execute_and_transmute(cmd, security_ms, start_rpc).await {
                         Ok((transmuted_text, is_error)) => {
                             json!({
                                 "jsonrpc": "2.0",
@@ -128,7 +144,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     Ok(())
 }
 
-async fn execute_and_transmute(cmd: &str) -> Result<(String, bool), Box<dyn std::error::Error + Send + Sync>> {
+async fn execute_and_transmute(
+    cmd: &str, 
+    security_ms: u128, 
+    rpc_timer: Instant
+) -> Result<(String, bool), Box<dyn std::error::Error + Send + Sync>> {
     let start_shell = Instant::now();
     
     // Create temporary spool file
@@ -180,13 +200,15 @@ async fn execute_and_transmute(cmd: &str) -> Result<(String, bool), Box<dyn std:
         final_text.push_str(&String::from_utf8_lossy(&chunk.data));
     }
 
-    // LAYER 4: Audit Persistence
+    // LAYER 4: Audit Persistence (Header Log)
     let record = AuditLogRecord {
         timestamp: chrono::Utc::now(),
         command: cmd.to_string(),
         exit_code: status.code().unwrap_or(-1),
+        security_ms,
         shell_ms,
         proxy_ms,
+        total_ms: rpc_timer.elapsed().as_millis(),
         input_bytes: result.statistics.input_size_bytes as usize,
         output_bytes: final_text.len(),
     };
@@ -219,13 +241,16 @@ fn offload_to_sqlite(record: &AuditLogRecord) -> TransResult<()> {
     let conn = rusqlite::Connection::open(&db_path)
         .map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Connection failed", e))?;
 
+    // Create schema with new columns for v11
     conn.execute(
-        "CREATE TABLE IF NOT EXISTS audit_events (
+        "CREATE TABLE IF NOT EXISTS audit_events_v11 (
             timestamp TEXT,
             command TEXT,
             exit_code INTEGER,
+            security_ms INTEGER,
             shell_ms INTEGER,
             proxy_ms INTEGER,
+            total_ms INTEGER,
             input_bytes INTEGER,
             output_bytes INTEGER
         )",
@@ -233,13 +258,15 @@ fn offload_to_sqlite(record: &AuditLogRecord) -> TransResult<()> {
     ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Table creation failed", e))?;
 
     conn.execute(
-        "INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO audit_events_v11 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         rusqlite::params![
             record.timestamp.to_rfc3339(),
             record.command,
             record.exit_code,
+            record.security_ms as i64,
             record.shell_ms as i64,
             record.proxy_ms as i64,
+            record.total_ms as i64,
             record.input_bytes as i64,
             record.output_bytes as i64,
         ],
