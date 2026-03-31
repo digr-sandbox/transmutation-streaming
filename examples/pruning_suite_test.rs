@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
+use regex::Regex;
 
 /// --- THE PRUNING SUITE: Core Algorithms ---
 
@@ -17,6 +18,18 @@ struct WordAudit {
     kept: bool,
 }
 
+fn is_protected(word: &str) -> bool {
+    // Regex masks for "Hard Locks"
+    lazy_static::lazy_static! {
+        static ref IP_RE: Regex = Regex::new(r"^\d{1,3}\.\d+\.\d+\.\d+$").unwrap();
+        static ref PATH_RE: Regex = Regex::new(r"^[/\\]?[\w/\\.-]+\.[a-z0-9]{1,5}$").unwrap();
+        static ref TAG_RE: Regex = Regex::new(r"^<[^>]+>$").unwrap();
+        static ref HEX_RE: Regex = Regex::new(r"^0x[0-9a-fA-F]+$").unwrap();
+    }
+    
+    IP_RE.is_match(word) || PATH_RE.is_match(word) || TAG_RE.is_match(word) || HEX_RE.is_match(word)
+}
+
 fn run_suite(words: &[String], config: &Config) -> Vec<WordAudit> {
     // 1. IDF Scoring (Global Context)
     let mut freq_map = HashMap::new();
@@ -28,6 +41,16 @@ fn run_suite(words: &[String], config: &Config) -> Vec<WordAudit> {
     const WINDOW: usize = 10;
 
     for (idx, word) in words.iter().enumerate() {
+        // Check for Hard Lock Protection first
+        if is_protected(word) {
+            audits.push(WordAudit {
+                text: word.clone(),
+                final_score: f64::INFINITY, // Absolute protection
+                kept: false,
+            });
+            continue;
+        }
+
         // IDF
         let count = freq_map.get(word).unwrap_or(&1);
         let idf = (total / *count as f64).ln();
@@ -60,6 +83,13 @@ fn run_suite(words: &[String], config: &Config) -> Vec<WordAudit> {
     let keep_count = (audits.len() as f64 * config.compression_ratio) as usize;
     for &idx in sorted_indices.iter().take(keep_count) {
         audits[idx].kept = true;
+    }
+    
+    // Always keep Infinite score items regardless of ratio
+    for audit in &mut audits {
+        if audit.final_score.is_infinite() {
+            audit.kept = true;
+        }
     }
 
     audits

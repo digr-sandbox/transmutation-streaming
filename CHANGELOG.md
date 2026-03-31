@@ -32,6 +32,14 @@ Introduces robust stdin streaming and OOM protections, enabling `transmutation` 
 - **Stdin Streaming (`convert -`)**: Added support for reading from standard input.
 - **Single Reconstructed File Spooler**: Added a constant-memory (~8KB) spooler that safely writes massive pipes to disk before processing, protecting against OOM crashes.
 - **Heavy Pipe Stress Tests**: Added tests to guarantee data integrity across huge stream reconstructions.
+- **Pruning Suite Evaluation**: Implemented a comprehensive 35-case test suite to evaluate IDF, POS, and Entropy heuristics.
+
+### Research & Evaluation (Pruning Suite)
+Conducted a deep-dive into mathematical pruning reliability for shell proxies.
+- **Findings**: Pure statistical pruning (IDF/POS) achieved only 28% reliability in retaining critical data (IPs, Error Codes, Paths) due to "Mathematical Neutrality" traps.
+- **Mitigation Strategy 1 (Hard Locks)**: Implementation of Regex masks for IPs, Paths, and Hashes to assign Infinite Importance scores.
+- **Mitigation Strategy 2 (Structural Awareness)**: Protection of XML/HTML tags and JSON markers from frequency-based suppression.
+- **Mitigation Strategy 3 (Adaptive Ratios)**: Moving from static 50% pruning to entropy-weighted pruning to prevent "Signal Loss" in dense error logs.
 
 ### Fixed
 - **TxtConverter OOM Vulnerability**: Removed `fs::read_to_string` from the plain text engine. The engine now parses text line-by-line using `BufReader`, preventing crashes on massive log files.
