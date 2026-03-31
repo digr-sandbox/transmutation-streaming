@@ -293,15 +293,33 @@ async fn run_command(cli: Cli) -> Result<()> {
                     std::fs::create_dir_all(d).map_err(|e| transmutation::TransmutationError::IoError(e))?;
                 }
                 
+                // 1. Sniff the first 8KB to determine the true file format
+                let mut sniff_buffer = vec![0; 8192];
+                let mut sniff_len = 0;
+                while sniff_len < 8192 {
+                    let n = stdin.read(&mut sniff_buffer[sniff_len..]).map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                    if n == 0 { break; }
+                    sniff_len += n;
+                }
+                sniff_buffer.truncate(sniff_len);
+                
+                // Detect format using file-format crate natively
+                let format_detector = file_format::FileFormat::from_bytes(&sniff_buffer);
+                let detected_ext = format_detector.extension();
+                
+                // The temp file represents the INPUT, so it must use the detected input extension.
+                // We ignore the output_path extension because that defines the target, not the source.
+                let final_ext = if detected_ext == "id3" {
+                     "mp3"
+                } else if detected_ext != "bin" && !detected_ext.is_empty() {
+                     detected_ext
+                } else {
+                     "txt"
+                };
+
                 let mut builder = tempfile::Builder::new();
                 builder.prefix("transmutation_pipe_");
-                
-                // If the user specified an output file extension, use it to hint the format detector
-                let ext_string = if let Some(ext) = output_path.extension().and_then(|e| e.to_str()) {
-                    format!(".{}", ext)
-                } else {
-                    ".txt".to_string()
-                };
+                let ext_string = format!(".{}", final_ext);
                 builder.suffix(&ext_string);
                 
                 let mut temp_file = match custom_temp {
@@ -310,10 +328,14 @@ async fn run_command(cli: Cli) -> Result<()> {
                 };
                 
                 if !cli.quiet {
+                    println!("  Detected Stream Format: .{} (via {})", final_ext, format_detector.media_type());
                     println!("  Streaming stdin to disk... (Constant RAM usage)");
                 }
                 
-                // Spool the entire stream into the single temp file
+                // Write the sniffed bytes first
+                temp_file.write_all(&sniff_buffer).map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                
+                // Spool the rest of the stream into the single temp file
                 std::io::copy(&mut stdin, &mut temp_file).map_err(|e| transmutation::TransmutationError::IoError(e))?;
                 temp_file.flush().map_err(|e| transmutation::TransmutationError::IoError(e))?;
                 
