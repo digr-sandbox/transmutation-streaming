@@ -1,6 +1,14 @@
 # Transmutation Integration Roadmap
 
-## 1. Prompt Compression Engine Integration
+## 1. Infrastructure Hardening (Completed)
+The streaming pipeline has been hardened to prevent OOM crashes during the reconnaissance phase.
+
+### Features implemented:
+*   **OOM-Safe Format Detection**: Patched `detect_by_magic_bytes` to read only the first 8KB of a file. This ensures that even if a 100GB stream is spooled to disk, the "Sniffing" phase uses constant RAM.
+*   **Feature-Aware Routing**: Improved error messaging to distinguish between truly unsupported formats and recognized formats that are simply missing a feature flag (e.g., `audio`, `video`, `office`).
+*   **Binary Stream Stress Tests**: Verified that the "Stream Sniffer" correctly overrides extensions based on magic bytes for PDF, ZIP, and MP3 streams up to 30MB.
+
+## 2. Prompt Compression Engine Integration
 We need to integrate the core features of the `compression-prompt` crate into the `transmutation` streaming pipeline to perform on-the-fly context reduction for LLM agents.
 
 ### Features to Port:

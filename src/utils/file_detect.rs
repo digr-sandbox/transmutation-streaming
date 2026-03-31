@@ -53,9 +53,15 @@ async fn detect_office_format_from_zip(path: &Path) -> Result<FileFormat> {
 /// Detect format by reading magic bytes
 async fn detect_by_magic_bytes(path: &Path) -> Result<FileFormat> {
     use file_format::FileFormat as FFFormat;
+    use tokio::io::AsyncReadExt;
 
-    let data = tokio::fs::read(path).await?;
-    let ff_format = FFFormat::from_bytes(&data);
+    // Read only the first 8KB for header sniffing
+    let mut file = tokio::fs::File::open(path).await?;
+    let mut buffer = vec![0; 8192];
+    let n = file.read(&mut buffer).await?;
+    buffer.truncate(n);
+    
+    let ff_format = FFFormat::from_bytes(&buffer);
 
     let format = match ff_format.media_type() {
         "application/pdf" => FileFormat::Pdf,

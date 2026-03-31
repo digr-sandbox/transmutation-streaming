@@ -293,8 +293,21 @@ impl ConversionBuilder {
         }
 
         // Format not supported or feature not enabled
+        let feature_hint = if input_format.is_audio() {
+            " (enable 'audio' feature)"
+        } else if input_format.is_video() {
+            " (enable 'video' feature)"
+        } else if input_format.is_image() {
+            " (enable 'image-ocr' feature)"
+        } else if matches!(input_format, FileFormat::Docx | FileFormat::Xlsx | FileFormat::Pptx) {
+            " (enable 'office' feature)"
+        } else {
+            ""
+        };
+
         Err(TransmutationError::UnsupportedFormat(format!(
-            "Format {input_format:?} is not supported or feature not enabled"
+            "Format {input_format:?} is not supported or feature not enabled{}",
+            feature_hint
         )))
     }
 }
