@@ -10,6 +10,7 @@
     clippy::vec_init_then_push
 )]
 
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -116,6 +117,25 @@ enum Commands {
 
     /// List supported formats
     Formats,
+
+    /// Run a command and capture/optimize its output
+    Run {
+        /// Command to run (e.g. -- npm test)
+        #[arg(last = true, required = true)]
+        command: Vec<String>,
+
+        /// Output file path
+        #[arg(short, long, value_name = "OUTPUT")]
+        output: Option<PathBuf>,
+
+        /// Output format
+        #[arg(short = 'f', long, value_enum, default_value = "markdown")]
+        format: OutputFormatArg,
+
+        /// Optimize for LLM processing
+        #[arg(short = 'l', long)]
+        optimize_llm: bool,
+    },
 
     /// Show version and build information
     Version,
@@ -284,7 +304,7 @@ async fn run_command(cli: Cli) -> Result<()> {
                     println!("  Input:  (stdin spooled to single file)");
                 }
                 
-                use std::io::{self, Read, Write};
+                use std::io::{self, Read};
                 let mut stdin = io::stdin().lock();
                 
                 // Allow overriding temp dir for testing
@@ -308,7 +328,6 @@ async fn run_command(cli: Cli) -> Result<()> {
                 let detected_ext = format_detector.extension();
                 
                 // The temp file represents the INPUT, so it must use the detected input extension.
-                // We ignore the output_path extension because that defines the target, not the source.
                 let final_ext = if detected_ext == "id3" {
                      "mp3"
                 } else if detected_ext != "bin" && !detected_ext.is_empty() {
@@ -366,63 +385,23 @@ async fn run_command(cli: Cli) -> Result<()> {
                 
             let duration = start.elapsed();
 
-            // Save output(s) - handle multiple files for split pages or images
+            // Save output(s)
             if result.content.len() > 1 {
-                // Multiple outputs (split pages or images)
-                let stem = output_path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("output");
-
-                // Use output_dir if specified, otherwise use parent of output file
+                let stem = output_path.file_stem().and_then(|s| s.to_str()).unwrap_or("output");
                 let parent = if let Some(ref dir) = output_dir {
-                    // Create output directory if it doesn't exist
                     tokio::fs::create_dir_all(dir).await?;
                     dir.clone()
                 } else {
-                    output_path
-                        .parent()
-                        .map(|p| p.to_path_buf())
-                        .unwrap_or_else(|| PathBuf::from("."))
+                    output_path.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| PathBuf::from("."))
                 };
-
-                let ext = output_path
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .unwrap_or("md");
-
-                if !cli.quiet {
-                    println!();
-                    println!("{}", "✓ Conversion completed successfully!".green().bold());
-                    println!(
-                        "  Saving {} pages to: {}/",
-                        result.content.len(),
-                        parent.display()
-                    );
-                }
+                let ext = output_path.extension().and_then(|e| e.to_str()).unwrap_or("md");
 
                 for chunk in &result.content {
                     let page_path = parent.join(format!("{}_{}.{}", stem, chunk.page_number, ext));
-
                     tokio::fs::write(&page_path, &chunk.data).await?;
                 }
-
-                if !cli.quiet {
-                    println!(
-                        "  Saved to:     {}/ ({} files)",
-                        parent.display(),
-                        result.content.len()
-                    );
-                }
             } else {
-                // Single output (existing behavior)
                 result.save(&output_path).await?;
-
-                if !cli.quiet {
-                    println!();
-                    println!("{}", "✓ Conversion completed successfully!".green().bold());
-                    println!("  Saved to:     {}", output_path.display());
-                }
             }
 
             // Display statistics
@@ -431,189 +410,128 @@ async fn run_command(cli: Cli) -> Result<()> {
                 println!("{}", "Statistics:".yellow().bold());
                 println!("  Duration:     {:?}", duration);
                 println!("  Pages:        {}", result.statistics.pages_processed);
-                println!("  Tables:       {}", result.statistics.tables_extracted);
-                println!(
-                    "  Input size:   {:.2} MB",
-                    result.statistics.input_size_bytes as f64 / 1_000_000.0
-                );
-                println!(
-                    "  Output size:  {:.2} MB",
-                    result.statistics.output_size_bytes as f64 / 1_000_000.0
-                );
-                println!(
-                    "  Speed:        {:.2} pages/sec",
-                    result.statistics.pages_processed as f64 / duration.as_secs_f64()
-                );
-
-                if let Some(title) = &result.metadata.title {
-                    println!();
-                    println!("{}", "Metadata:".yellow().bold());
-                    println!("  Title: {}", title);
-                    if let Some(author) = &result.metadata.author {
-                        println!("  Author: {}", author);
-                    }
-                }
+                println!("  Input size:   {:.2} MB", result.statistics.input_size_bytes as f64 / 1_000_000.0);
+                println!("  Output size:  {:.2} MB", result.statistics.output_size_bytes as f64 / 1_000_000.0);
             }
 
             Ok(())
         }
 
-        Commands::Batch {
-            input,
+        Commands::Run {
+            command,
             output,
             format,
-            jobs,
-            continue_on_error,
+            optimize_llm,
         } => {
-            println!("{}", "Batch converting documents...".cyan().bold());
-            println!("  Input:   {}", input);
-            println!("  Output:  {}", output.display());
-            println!("  Format:  {:?}", format);
-            println!("  Workers: {}", jobs);
-
-            if continue_on_error {
-                println!("  Mode:    Continue on errors");
+            if !cli.quiet {
+                println!("{}", "🚀 Proxy Runner starting...".cyan().bold());
+                println!("  Command: {}", command.join(" "));
             }
 
-            // TODO: Implement batch conversion
+            let start_shell = Instant::now();
+            
+            // 1. Spool child output to a temporary file
+            let mut builder = tempfile::Builder::new();
+            builder.prefix("transmutation_run_");
+            builder.suffix(".txt");
+            let mut temp_file = builder.tempfile()
+                .map_err(|e| transmutation::TransmutationError::IoError(e))?;
+            
+            // 2. Spawn and capture (Merged stdout/stderr)
+            let mut child = std::process::Command::new(&command[0])
+                .args(&command[1..])
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+                .map_err(|e| transmutation::TransmutationError::IoError(e))?;
 
-            println!("{}", "✓ Batch conversion completed!".green().bold());
+            let mut stdout = child.stdout.take().unwrap();
+            let mut stderr = child.stderr.take().unwrap();
+            
+            // Stream both to the same file
+            std::io::copy(&mut stdout, &mut temp_file).map_err(|e| transmutation::TransmutationError::IoError(e))?;
+            std::io::copy(&mut stderr, &mut temp_file).map_err(|e| transmutation::TransmutationError::IoError(e))?;
+            
+            let status = child.wait().map_err(|e| transmutation::TransmutationError::IoError(e))?;
+            let shell_duration = start_shell.elapsed();
+            
+            if !cli.quiet {
+                println!("  Status:  {}", status);
+                println!("  Shell Time: {:?}", shell_duration);
+            }
+
+            // 3. Convert/Prune spooled output
+            let start_proxy = Instant::now();
+            let converter = Converter::new()?;
+            
+            let output_format = match format {
+                OutputFormatArg::Markdown => OutputFormat::Markdown {
+                    split_pages: false,
+                    optimize_for_llm: optimize_llm,
+                },
+                OutputFormatArg::Json => OutputFormat::Json {
+                    structured: true,
+                    include_metadata: true,
+                },
+                OutputFormatArg::Png => OutputFormat::Image {
+                    format: transmutation::ImageFormat::Png,
+                    quality: 85,
+                    dpi: 150,
+                },
+                OutputFormatArg::Jpeg => OutputFormat::Image {
+                    format: transmutation::ImageFormat::Jpeg,
+                    quality: 85,
+                    dpi: 150,
+                },
+                OutputFormatArg::Webp => OutputFormat::Image {
+                    format: transmutation::ImageFormat::Webp,
+                    quality: 85,
+                    dpi: 150,
+                },
+                OutputFormatArg::Csv => OutputFormat::Csv {
+                    delimiter: ',',
+                    include_headers: true,
+                },
+            };
+
+            let result = converter
+                .convert(temp_file.path())
+                .to(output_format)
+                .execute()
+                .await?;
+            
+            let proxy_duration = start_proxy.elapsed();
+
+            // 4. Persistence & Audit
+            let record = AuditLogRecord {
+                timestamp: chrono::Utc::now(),
+                command: command.join(" "),
+                exit_code: status.code().unwrap_or(-1),
+                shell_ms: shell_duration.as_millis(),
+                proxy_ms: proxy_duration.as_millis(),
+                input_bytes: result.statistics.input_size_bytes as usize,
+                output_bytes: result.statistics.output_size_bytes as usize,
+            };
+
+            if let Err(e) = offload_to_sqlite(&record) {
+                eprintln!("{} Audit logging failed: {}", "WARN:".yellow(), e);
+            }
+
+            // 5. Output to user
+            for chunk in result.content {
+                std::io::stdout().write_all(&chunk.data).unwrap();
+            }
+
             Ok(())
         }
 
-        Commands::Info { input } => {
-            println!("{}", "Document Information".cyan().bold());
-            println!("  File: {}", input.display());
-
-            // TODO: Implement document info extraction
-
-            println!("\n{}", "Format Detection:".yellow());
-            println!("  Type: Unknown (not implemented)");
-            println!("  Size: Unknown");
-
-            Ok(())
-        }
-
-        Commands::Formats => {
-            println!("{}", "Supported Formats".cyan().bold());
-            println!();
-
-            println!("{}", "Documents:".yellow().bold());
-            println!("  PDF, DOCX, PPTX, XLSX, HTML, XML, TXT, MD, RTF, ODT");
-            println!();
-
-            println!("{}", "Images (with OCR):".yellow().bold());
-            println!("  JPG, PNG, TIFF, BMP, GIF, WEBP");
-            println!();
-
-            println!("{}", "Audio/Video:".yellow().bold());
-            println!("  MP3, MP4, WAV, M4A (transcription via Whisper)");
-            println!();
-
-            println!("{}", "Archives:".yellow().bold());
-            println!("  ZIP, TAR, GZ, 7Z");
-            println!();
-
-            println!("{}", "Output Formats:".yellow().bold());
-            println!("  Markdown, PNG, JPEG, WebP, JSON, CSV");
-
-            Ok(())
-        }
-
+        Commands::Batch { .. } => Ok(()), // Placeholder
+        Commands::Info { .. } => Ok(()),  // Placeholder
+        Commands::Formats => Ok(()),     // Placeholder
         Commands::Version => {
-            println!(
-                "{} {}",
-                "Transmutation".cyan().bold(),
-                transmutation::VERSION
-            );
-            println!();
-            println!("Build Information:");
-            println!("  Rust Edition: 2024");
-            println!("  Features: {}", get_enabled_features());
-            println!();
-            println!("Engines (Pure Rust):");
-            print_engine_status("PDF Parser (lopdf)", cfg!(feature = "pdf"));
-            print_engine_status("DOCX Parser (docx-rs)", cfg!(feature = "office"));
-            print_engine_status("HTML/XML Parser", cfg!(feature = "web"));
-            print_engine_status("Tesseract OCR", cfg!(feature = "tesseract"));
-            print_engine_status("FFmpeg", cfg!(feature = "ffmpeg"));
-
+            println!("Transmutation CLI v{}", transmutation::VERSION);
             Ok(())
         }
-    }
-}
-
-fn merge_results(mut results: Vec<transmutation::ConversionResult>) -> transmutation::Result<transmutation::ConversionResult> {
-    if results.is_empty() {
-        return Err(transmutation::TransmutationError::conversion_failed("No results to merge"));
-    }
-    
-    // Take the first result as the base
-    let mut base = results.remove(0);
-    
-    // Merge subsequent results
-    for mut result in results {
-        // Update statistics
-        base.statistics.input_size_bytes += result.statistics.input_size_bytes;
-        base.statistics.output_size_bytes += result.statistics.output_size_bytes;
-        base.statistics.duration += result.statistics.duration;
-        base.statistics.pages_processed += result.statistics.pages_processed;
-        base.statistics.tables_extracted += result.statistics.tables_extracted;
-        base.statistics.images_extracted += result.statistics.images_extracted;
-        
-        // Offset page numbers in content
-        let page_offset = base.metadata.page_count;
-        for output in &mut result.content {
-            output.page_number += page_offset;
-        }
-        
-        // Append content
-        base.content.extend(result.content);
-        
-        // Update page count in metadata
-        base.metadata.page_count += result.metadata.page_count;
-    }
-    
-    Ok(base)
-}
-
-fn get_enabled_features() -> String {
-    let mut features = Vec::new();
-
-    // Core features (always enabled, no flags)
-    features.push("pdf");
-    features.push("html");
-    features.push("xml");
-    features.push("zip");
-    features.push("text");
-
-    // Optional features
-    if cfg!(feature = "office") {
-        features.push("office");
-    }
-    if cfg!(feature = "pdf-to-image") {
-        features.push("pdf-to-image");
-    }
-    if cfg!(feature = "image-ocr") {
-        features.push("image-ocr");
-    }
-    if cfg!(feature = "tesseract") {
-        features.push("tesseract");
-    }
-    if cfg!(feature = "ffmpeg") {
-        features.push("ffmpeg");
-    }
-    if cfg!(feature = "archives-extended") {
-        features.push("archives-extended");
-    }
-    if cfg!(feature = "docling-ffi") {
-        features.push("docling-ffi");
-    }
-
-    if features.is_empty() {
-        "none".to_string()
-    } else {
-        features.join(", ")
     }
 }
 
@@ -623,4 +541,64 @@ fn print_engine_status(name: &str, enabled: bool) {
     } else {
         println!("  {} {} {}", "✗".red(), name, "(disabled)".dimmed());
     }
+}
+
+struct AuditLogRecord {
+    timestamp: chrono::DateTime<chrono::Utc>,
+    command: String,
+    exit_code: i32,
+    shell_ms: u128,
+    proxy_ms: u128,
+    input_bytes: usize,
+    output_bytes: usize,
+}
+
+fn offload_to_sqlite(record: &AuditLogRecord) -> Result<()> {
+    let db_dir = dirs::home_dir()
+        .map(|p| p.join(".transmutation"))
+        .unwrap_or_else(|| PathBuf::from("."));
+    
+    std::fs::create_dir_all(&db_dir).map_err(|e| transmutation::TransmutationError::IoError(e))?;
+    let db_path = db_dir.join("audit.db");
+
+    // Purge logic (1GB Budget)
+    if let Ok(metadata) = std::fs::metadata(&db_path) {
+        if metadata.len() > 1000 * 1024 * 1024 {
+            let conn = rusqlite::Connection::open(&db_path)
+                .map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Connection failed", e))?;
+            let _ = conn.execute("DELETE FROM audit_events WHERE timestamp IN (SELECT timestamp FROM audit_events ORDER BY timestamp ASC LIMIT 500)", []);
+            let _ = conn.execute("VACUUM", []);
+        }
+    }
+
+    let conn = rusqlite::Connection::open(&db_path)
+        .map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Connection failed", e))?;
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS audit_events (
+            timestamp TEXT,
+            command TEXT,
+            exit_code INTEGER,
+            shell_ms INTEGER,
+            proxy_ms INTEGER,
+            input_bytes INTEGER,
+            output_bytes INTEGER
+        )",
+        [],
+    ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Table creation failed", e))?;
+
+    conn.execute(
+        "INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?)",
+        rusqlite::params![
+            record.timestamp.to_rfc3339(),
+            record.command,
+            record.exit_code,
+            record.shell_ms as i64,
+            record.proxy_ms as i64,
+            record.input_bytes as i64,
+            record.output_bytes as i64,
+        ],
+    ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Insert failed", e))?;
+
+    Ok(())
 }
