@@ -130,6 +130,7 @@ dirs = "5.0"
 sysinfo = "0.33"
 zstd = "0.13"
 chrono = { version = "0.4", features = ["serde"] }
+rusqlite = { version = "0.33", features = ["bundled"] }
 
 # CLI dependencies
 clap = { version = "4.5", features = ["derive", "cargo", "env"], optional = true }
