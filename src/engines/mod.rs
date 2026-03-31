@@ -6,6 +6,7 @@
 pub mod layout_analyzer;
 pub mod pdf_parser;
 pub mod table_detector;
+pub mod security;
 
 // Advanced FFI engines (optional)
 #[cfg(feature = "docling-ffi")]

@@ -1,0 +1,47 @@
+[
+  {
+    "name": "01_Global_System_Vault",
+    "logic": "t.function.arguments.matches('(?i).*(\\.bashrc|\\.zshrc|\\.pem|\\.key|credentials|shadow|passwd|id_).*')",
+    "message": "Security Policy: Access to root system files and credentials is strictly prohibited."
+  },
+  {
+    "name": "02_Config_DB_Isolation",
+    "logic": "t.function.name == 'execute_command' && t.function.arguments.matches('(?i).*(cat |grep |rg |ag |ack |less |more |vi |nano |view |edit |cp |mv |ln ).*(\\.env|config\\..*|\\.sqlite|\\.db).*')",
+    "message": "Security Policy: Shell-based access to config/DB files is blocked. You MUST use native 'read_file' or 'edit_file' tools. 'head' and 'tail' are permitted."
+  },
+  {
+    "name": "03_Secret_Hunting_Dumping",
+    "logic": "t.function.name == 'execute_command' && t.function.arguments.matches('(?i).*(grep|ag|rg|find|ack).*(key|secret|token|password|auth|credential).*|^(env|printenv|export|set)$')",
+    "message": "Security Policy: Environment dumping and bulk secret scanning are prohibited."
+  },
+  {
+    "name": "04_Timeout_Minimum_Enforcement",
+    "logic": "t.function.name == 'execute_command' && t.function.arguments.matches('(?i).*timeout\\s+([1-9]|[1-9][0-9]|[1-2][0-9][0-9])s?\\b.*')",
+    "message": "Policy Violation: Timeouts under 300s are prohibited to prevent execution failure. Please re-run the command with a timeout of 300s or greater."
+  },
+  {
+    "name": "05_Bad_Regex_And_Redirection",
+    "logic": "t.function.name == 'execute_command' && (t.function.arguments.matches('(?i).*(rm -rf|rm -f|sed |awk |patch |truncate).*') || t.function.arguments.matches('(?i).*ssh .*\\b(rm -rf|rm -f|drop database|truncate)\\b.*') || (t.function.arguments.matches('(?i).*(>|>>).*') && !t.function.arguments.matches('(?i).*(\\.log|/tmp/|2>&1|/dev/null).*')))",
+    "message": "Security Policy: Destructive commands, stream editors (sed/awk), and arbitrary file redirection are blocked. Use native tools for file edits."  
+  },
+  {
+    "name": "06_GitHub_Contributor_Safety",
+    "logic": "t.function.name == 'execute_command' && t.function.arguments.matches('(?i).*gh (repo delete|pr merge|secret set|auth logout).*')",
+    "message": "Security Policy: You are restricted to contributor actions. Repository deletion and PR merging require human intervention."
+  },
+  {
+    "name": "07_Sudo_And_Blind_Execution",
+    "logic": "t.function.name == 'execute_command' && t.function.arguments.matches('(?i).*(^|\\s)(sudo |curl.*\\|.*bash|wget.*\\|.*sh).*')",
+    "message": "Security Policy: Sudo privileges and piping web scripts directly to shell are strictly blocked."
+  },
+  {
+    "name": "08_Native_Tool_Config_Deletion",
+    "logic": "t.function.name == 'delete_file' && t.function.arguments.matches('(?i).*(\\.env|config\\..*|\\.sqlite|\\.db).*')",
+    "message": "Security Policy: Deleting environment configs or local databases is completely prohibited."
+  },
+  {
+    "name": "09_Cloud_PaaS_Safety",
+    "logic": "t.function.name == 'execute_command' && t.function.arguments.matches('(?i).*\\b(terraform destroy|tofu destroy|pulumi destroy|kubectl delete|helm uninstall|wp db (reset|drop)|docker (system prune|rm|rmi)|(aws|gcloud|az|oci|doctl|vercel|vc|wrangler|netlify|ntl|heroku)\\s+.*\\b(delete|rm|remove|destroy)\\b).*')",
+    "message": "Security Policy: Destructive actions against cloud infrastructure, PaaS deployments, and container environments are blocked."
+  }
+]

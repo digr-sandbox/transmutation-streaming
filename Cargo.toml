@@ -40,6 +40,11 @@ name = "transmutation"
 path = "src/bin/transmutation.rs"
 required-features = ["cli"]
 
+[[bin]]
+name = "transmutation-mcp-proxy"
+path = "src/bin/mcp_proxy.rs"
+required-features = ["cli"]
+
 [dependencies]
 # Async runtime
 tokio = { version = "1.47", features = ["full"] }
