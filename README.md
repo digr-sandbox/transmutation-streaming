@@ -22,13 +22,41 @@ Transmutation implements a Thompson NFA-based security firewall that evaluates c
 
 Transmutation doesn't just "truncate" text; it performs **Semantic Transmutation** using several integrated algorithms to squeeze massive shell outputs into context-safe packets. 
 
-📖 **For an in-depth mathematical breakdown of how Transmutation uses Expectation-Maximization and TOON parsing, read the [Latent-K & TOON Architecture Guide](docs/latent-k.md).**
+📖 **For a deep dive into the underlying mathematics (Expectation-Maximization) and structural array collapsing, read the [Latent-K Architecture Guide](docs/latent-k.md) and the [TOON Format Specification](docs/toon.md).**
 
 ### 🛠️ Dual MCP Tool Architecture
 Transmutation exposes two distinct Model Context Protocol (MCP) tools to the agent, providing a safety net against over-compression:
 
 1. **`execute_command` (Default)**: The primary tool. It runs the command, applies security gates, and aggressively crushes the output. If the output is compressed, it prepends a `# ⚡ PROVENANCE` header.
 2. **`execute_command_unaltered` (Escape Hatch)**: Runs the command and security gates, but completely **bypasses compression**. The agent is instructed to call this fallback tool ONLY if the default tool returns ambiguous, broken, or overly-pruned results.
+3. **`read_code_map` (Architecture Index)**: Queries the background SQLite dependency graph to instantly return what files the target imports, and what files import the target.
+
+### 🔌 Connecting the MCP Server
+To use the Transmutation Agentic Gateway in your AI tools, you must configure them to launch the `transmutation-mcp-proxy` binary using the `stdio` transport.
+
+**For Claude Code (`claude.json`):**
+```json
+{
+  "mcpServers": {
+    "transmutation": {
+      "command": "transmutation-mcp-proxy",
+      "args": ["--stdio"]
+    }
+  }
+}
+```
+
+**For OpenClaw / Cursor (`mcp.json`):**
+```json
+{
+  "mcpServers": {
+    "transmutation": {
+      "command": "cargo",
+      "args": ["run", "--bin", "transmutation-mcp-proxy", "--", "--stdio"]
+    }
+  }
+}
+```
 
 ### 🧩 Routing & Latent-K Structural Extraction
 The engine dynamically routes output based on the command type:
