@@ -1,7 +1,7 @@
-//! Transmutation MCP Proxy - Unified Security & Compression Server (v12)
+//! Transmutation MCP Proxy - Unified Security & Compression Server (v13)
 //!
 //! Fully compliant with the 2026 Model Context Protocol (MCP) Standards.
-//! Features: Thompson NFA Security, Multi-Tenant Provenance, Database Janitor.
+//! Features: Thompson NFA Security, Multi-Tenant Provenance, Header/Detail/Footer Audit Schema.
 
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
@@ -154,12 +154,17 @@ async fn execute_and_transmute(cmd: &str, security_ms: u128, rpc_timer: Instant)
 
     let mut stdout = child.stdout.take().unwrap();
     let mut stderr = child.stderr.take().unwrap();
+    
+    // Spool to disk (OOM-Safe)
     let mut file = tokio::fs::File::from_std(temp_file.reopen()?);
     tokio::io::copy(&mut stdout, &mut file).await?;
     tokio::io::copy(&mut stderr, &mut file).await?;
     
     let status = child.wait().await?;
     let shell_ms = start_shell.elapsed().as_millis();
+
+    // Read raw input back for auditing (before pruning)
+    let raw_input = std::fs::read_to_string(temp_file.path()).unwrap_or_default();
 
     let start_proxy = Instant::now();
     let converter = Converter::new()?;
@@ -181,7 +186,7 @@ async fn execute_and_transmute(cmd: &str, security_ms: u128, rpc_timer: Instant)
         output_bytes: final_text.len(),
     };
 
-    let _ = offload_to_sqlite(&record);
+    let _ = offload_to_sqlite(&record, &raw_input, &final_text);
     Ok((final_text, !status.success()))
 }
 
@@ -190,7 +195,13 @@ fn get_provenance_from_db(req_id: &str) -> Result<String, Box<dyn std::error::Er
     let db_path = db_dir.join("audit.db");
     let conn = rusqlite::Connection::open(&db_path)?;
     
-    let mut stmt = conn.prepare("SELECT * FROM audit_events WHERE request_id = ?")?;
+    // Query joined tables for full provenance
+    let mut stmt = conn.prepare("
+        SELECT e.*, c.raw_input, c.final_output 
+        FROM audit_events e 
+        JOIN audit_content c ON e.request_id = c.request_id 
+        WHERE e.request_id = ?")?;
+        
     let mut rows = stmt.query_map([req_id], |row| {
         Ok(json!({
             "request_id": row.get::<_, String>(1)?,
@@ -199,8 +210,11 @@ fn get_provenance_from_db(req_id: &str) -> Result<String, Box<dyn std::error::Er
             "security_ms": row.get::<_, i64>(4)?,
             "shell_ms": row.get::<_, i64>(5)?,
             "proxy_ms": row.get::<_, i64>(6)?,
+            "total_ms": row.get::<_, i64>(7)?,
             "input_bytes": row.get::<_, i64>(8)?,
             "output_bytes": row.get::<_, i64>(9)?,
+            "raw_input_preview": row.get::<_, String>(10)?.chars().take(500).collect::<String>(),
+            "final_output_preview": row.get::<_, String>(11)?.chars().take(500).collect::<String>(),
         }))
     })?;
 
@@ -211,29 +225,78 @@ fn get_provenance_from_db(req_id: &str) -> Result<String, Box<dyn std::error::Er
     }
 }
 
-fn offload_to_sqlite(record: &AuditLogRecord) -> TransResult<()> {
+fn offload_to_sqlite(record: &AuditLogRecord, raw_input: &str, final_output: &str) -> TransResult<()> {
     let db_dir = dirs::home_dir()
         .map(|p| p.join(".transmutation"))
         .unwrap_or_else(|| PathBuf::from("."));
     let db_path = db_dir.join("audit.db");
-    let conn = rusqlite::Connection::open(&db_path).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Connection failed", e))?;
+    let mut conn = rusqlite::Connection::open(&db_path).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Connection failed", e))?;
 
-    conn.execute(
+    let tx = conn.transaction().map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "TX start failed", e))?;
+
+    // 1. Audit Headers (Metadata)
+    tx.execute(
         "CREATE TABLE IF NOT EXISTS audit_events (
-            timestamp TEXT, request_id TEXT, command TEXT, exit_code INTEGER,
-            security_ms INTEGER, shell_ms INTEGER, proxy_ms INTEGER, total_ms INTEGER,
-            input_bytes INTEGER, output_bytes INTEGER
+            request_id TEXT PRIMARY KEY,
+            timestamp TEXT,
+            command TEXT,
+            exit_code INTEGER,
+            security_ms INTEGER,
+            shell_ms INTEGER,
+            proxy_ms INTEGER,
+            total_ms INTEGER,
+            input_bytes INTEGER,
+            output_bytes INTEGER
         )", [],
-    ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Table creation failed", e))?;
+    ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Header table failed", e))?;
 
-    conn.execute(
+    // 2. Audit Details (Content)
+    tx.execute(
+        "CREATE TABLE IF NOT EXISTS audit_content (
+            request_id TEXT PRIMARY KEY,
+            raw_input TEXT,
+            final_output TEXT,
+            FOREIGN KEY(request_id) REFERENCES audit_events(request_id)
+        )", [],
+    ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Content table failed", e))?;
+
+    // 3. Accuracy Failures (Footer/Tracking)
+    tx.execute(
+        "CREATE TABLE IF NOT EXISTS accuracy_failures (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            request_id TEXT,
+            failed_line TEXT,
+            missed_token TEXT,
+            score_breakdown TEXT,
+            FOREIGN KEY(request_id) REFERENCES audit_events(request_id)
+        )", [],
+    ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Failure table failed", e))?;
+
+    tx.execute(
         "INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         rusqlite::params![
-            record.timestamp.to_rfc3339(), record.request_id, record.command, record.exit_code,
-            record.security_ms as i64, record.shell_ms as i64, record.proxy_ms as i64,
-            record.total_ms as i64, record.input_bytes as i64, record.output_bytes as i64,
+            record.request_id,
+            record.timestamp.to_rfc3339(),
+            record.command,
+            record.exit_code,
+            record.security_ms as i64,
+            record.shell_ms as i64,
+            record.proxy_ms as i64,
+            record.total_ms as i64,
+            record.input_bytes as i64,
+            record.output_bytes as i64,
         ],
-    ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Insert failed", e))?;
+    ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Header insert failed", e))?;
+
+    tx.execute(
+        "INSERT INTO audit_content VALUES (?, ?, ?)",
+        rusqlite::params![
+            record.request_id,
+            raw_input,
+            final_output,
+        ],
+    ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Content insert failed", e))?;
+
+    tx.commit().map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "TX commit failed", e))?;
     Ok(())
 }
-
