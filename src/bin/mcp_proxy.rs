@@ -212,13 +212,11 @@ fn get_provenance_from_db(req_id: &str) -> Result<String, Box<dyn std::error::Er
 }
 
 fn offload_to_sqlite(record: &AuditLogRecord) -> TransResult<()> {
-    let db_dir = dirs::home_dir().map(|p| p.join(".transmutation")).unwrap_or_else(|| PathBuf::from("."));
+    let db_dir = dirs::home_dir()
+        .map(|p| p.join(".transmutation"))
+        .unwrap_or_else(|| PathBuf::from("."));
     let db_path = db_dir.join("audit.db");
     let conn = rusqlite::Connection::open(&db_path).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Connection failed", e))?;
-
-    // THE JANITOR: Standardize schema and drop legacy tables
-    let _ = conn.execute("DROP TABLE IF EXISTS audit_events_v11", []);
-    let _ = conn.execute("DROP TABLE IF EXISTS audit_events_v10", []);
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS audit_events (
@@ -238,3 +236,4 @@ fn offload_to_sqlite(record: &AuditLogRecord) -> TransResult<()> {
     ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Insert failed", e))?;
     Ok(())
 }
+
