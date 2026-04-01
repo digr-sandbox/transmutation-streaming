@@ -1,0 +1,10 @@
+{
+  "project": "transmutation-streaming",
+  "version": "0.3.2",
+  "directories": [
+    ".cargo", ".cursor", ".github", "assets", "audit_logs", "cpp", "data", "debian", "docs", "examples", "install", "models", "pkg", "rulebook", "scripts", "src", "target", "tests", "wix"
+  ],
+  "files": [
+    "AGENTS.md", "build.rs", "Cargo.toml", "CHANGELOG.md", "clippy.toml", "CONTRIBUTING.md", "Dockerfile", "GEMINI.md", "LICENSE", "README.md", "rules.json", "rust-toolchain.toml", "rustfmt.toml", "todos.md"
+  ]
+}

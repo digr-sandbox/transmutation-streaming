@@ -1,0 +1,21 @@
+commit e699d4b7b187171c65b06694ed4f128a3c68e058 (HEAD -> main)
+Author: ericdigr <49377277+ericdigr@users.noreply.github.com>
+Date:   Wed Apr 1 12:16:38 2026 -0500
+
+    feat(mcp): Finalize v24 Proxy Architecture and 35-case Evaluation Suite
+    
+    - Ported ROI-optimized pruning logic to the evaluation suite.
+    - Synced Relational Audit Schema (Header/Detail/Footer) to production proxy.
+    - Hardened Thompson NFA security rules for destructive shell commands.
+    - Established 94% accuracy baseline across 35 technical test cases.
+
+commit 049a2cb060fba8c50aebe9878f8201943bbaf1e0
+Author: ericdigr <49377277+ericdigr@users.noreply.github.com>
+Date:   Wed Apr 1 11:45:36 2026 -0500
+
+    docs: Update README and Roadmap for Zero-Trust Agentic Gateway
+
+    - Refactored README to focus on terminal proxy and token crushing.
+    - Added feasibility tasks for conversion tool exposure and OCR integration.
+    - Documented crushing algorithms (TOON, Statistical Pruning, Lexicon Legends).
+    - Added installation guide for Windows, Linux, and macOS.

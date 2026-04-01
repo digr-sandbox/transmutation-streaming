@@ -1,0 +1,47 @@
+Usage: transmutation.exe [OPTIONS] [FILTERS...]
+
+Options:
+        --include-ignored 
+                        Run ignored and not ignored tests
+        --ignored       Run only ignored tests
+        --force-run-in-process 
+                        Forces tests to run in-process when panic=abort
+        --exclude-should-panic 
+                        Excludes tests marked as should_panic
+        --test          Run tests and not benchmarks
+        --bench         Run benchmarks instead of tests
+        --list          List all tests and benchmarks
+        --fail-fast     Don't start new tests after the first failure
+    -h, --help          Display this message
+        --logfile PATH  Write logs to the specified file (deprecated)
+        --no-capture    don't capture stdout/stderr of each task, allow
+                        printing directly
+        --test-threads n_threads
+                        Number of threads used for running tests in parallel
+        --skip FILTER   Skip tests whose names contain FILTER (this flag can
+                        be used multiple times)
+    -q, --quiet         Display one character per test instead of one line.
+                        Alias to --format=terse
+        --exact         Exactly match filters rather than by substring
+        --color auto|always|never
+                        Configure coloring of output:
+                        auto = colorize if stdout is a tty and tests are run
+                        on serially (default);
+                        always = always colorize output;
+                        never = never colorize output;
+        --format pretty|terse|json|junit
+                        Configure formatting of output:
+                        pretty = Print verbose output;
+                        terse = Display one character per test;
+                        json = Output a json document;
+                        junit = Output a JUnit document
+        --show-output   Show captured stdout of successful tests
+    -Z unstable-options Enable nightly-only flags:
+                        unstable-options = Allow use of experimental features
+        --report-time   Show execution time of each test.
+        --ensure-time   Treat excess of the test execution time limit as
+                        error.
+        --shuffle       Run tests in random order
+        --shuffle-seed SEED
+                        Run tests in random order; seed the random number
+                        generator with SEED

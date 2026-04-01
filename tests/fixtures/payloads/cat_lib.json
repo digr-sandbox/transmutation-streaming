@@ -1,0 +1,22 @@
+{
+  "must_preserve": [
+    "#![warn(missing_docs, missing_debug_implementations, rust_2024_compatibility)]",
+    "#![deny(unsafe_code)]",
+    "pub mod batch;",
+    "pub mod converters;",
+    "pub mod engines;",
+    "pub mod error;",
+    "pub mod pipeline;",
+    "pub use batch::{BatchProcessor, BatchResult};",
+    "pub use converters::{ConverterMetadata, DocumentConverter};",
+    "pub const VERSION: &str = env!(\"CARGO_PKG_VERSION\");",
+    "pub struct Converter {",
+    "pub struct ConverterConfig {"
+  ],
+  "can_prune": [
+    "Main converter interface",
+    "Converter configuration"
+  ],
+  "expected_bypass": true,
+  "minimum_compression_ratio": 0.0
+}

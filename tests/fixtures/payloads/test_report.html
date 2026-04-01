@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Report - transmutation-streaming</title>
+  <style>
+    body { font-family: sans-serif; }
+    .pass { color: green; }
+    .fail { color: red; }
+  </style>
+</head>
+<body>
+  <h1>Transmutation Test Execution Report</h1>
+  <p><strong>Run Date:</strong> 2026-04-01 12:00:00 UTC</p>
+  <p><strong>Environment:</strong> Windows-10.0.19045</p>
+  <h2>Summary</h2>
+  <ul>
+    <li>Total Tests: <span id="total">142</span></li>
+    <li>Passed: <span id="passed" class="pass">141</span></li>
+    <li>Failed: <span id="failed" class="fail">1</span></li>
+  </ul>
+  <h2>Failures</h2>
+  <div class="failure-box">
+    <h3>test_pdf_extraction_fails_on_corrupt_file</h3>
+    <pre><code>
+thread 'main' panicked at 'assertion failed: `(left == right)`
+  left: `Ok(())`,
+ right: `Err(TransmutationError::FormatUnsupported("PDF is corrupt"))`', tests/pdf_tests.rs:114:5
+    </code></pre>
+  </div>
+  <h2>Passing Tests (Sample)</h2>
+  <ul>
+    <li>test_basic_conversion_markdown</li>
+    <li>test_image_ocr_tesseract</li>
+    <li>test_audio_whisper_transcription</li>
+  </ul>
+</body>
+</html>

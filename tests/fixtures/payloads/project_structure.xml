@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="transmutation-streaming" version="0.3.2">
+  <directories>
+    <dir name=".cargo"/>
+    <dir name=".cursor"/>
+    <dir name=".github"/>
+    <dir name="assets"/>
+    <dir name="audit_logs"/>
+    <dir name="cpp"/>
+    <dir name="data"/>
+    <dir name="debian"/>
+    <dir name="docs"/>
+    <dir name="examples"/>
+    <dir name="install"/>
+    <dir name="models"/>
+    <dir name="pkg"/>
+    <dir name="rulebook"/>
+    <dir name="scripts"/>
+    <dir name="src"/>
+    <dir name="target"/>
+    <dir name="tests"/>
+    <dir name="wix"/>
+  </directories>
+  <files>
+    <file name="AGENTS.md"/>
+    <file name="build.rs"/>
+    <file name="Cargo.toml"/>
+    <file name="CHANGELOG.md"/>
+    <file name="clippy.toml"/>
+    <file name="CONTRIBUTING.md"/>
+    <file name="Dockerfile"/>
+    <file name="GEMINI.md"/>
+    <file name="LICENSE"/>
+    <file name="README.md"/>
+    <file name="rules.json"/>
+    <file name="rust-toolchain.toml"/>
+    <file name="rustfmt.toml"/>
+    <file name="todos.md"/>
+  </files>
+</project>

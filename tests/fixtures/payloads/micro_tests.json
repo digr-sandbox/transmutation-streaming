@@ -1,0 +1,212 @@
+[
+  {
+    "category": "Build Logs",
+    "name": "NPM Success",
+    "input": "npm info it worked. npm info using npm@10.2.4. webpack compiled successfully in 1243ms. output saved to ./dist/main.js",
+    "important_bits": ["successfully", "1243ms", "./dist/main.js"]
+  },
+  {
+    "category": "Build Logs",
+    "name": "Cargo Error",
+    "input": "error[E0432]: unresolved import `crate::missing`. --> src/lib.rs:10:5. 10 | use crate::missing; |     ^^^^^^^^^^^^^^. error: aborting due to previous error",
+    "important_bits": ["E0432", "src/lib.rs", "unresolved"]
+  },
+  {
+    "category": "Build Logs",
+    "name": "CMake Spam",
+    "input": "-- Check for working C compiler: /usr/bin/cc. -- Check for working C compiler: /usr/bin/cc -- works. -- Detecting C compiler ABI info. -- Detecting C compiler ABI info - done",
+    "important_bits": ["/usr/bin/cc", "works", "done"]
+  },
+  {
+    "category": "Build Logs",
+    "name": "Vite HMR",
+    "input": "10:15:01 AM [vite] hmr update /src/App.tsx. 10:15:02 AM [vite] hmr update /src/components/Button.tsx. page reloaded.",
+    "important_bits": ["hmr", "update", "/src/App.tsx"]
+  },
+  {
+    "category": "Build Logs",
+    "name": "Go Test Fail",
+    "input": "--- FAIL: TestConversion (0.05s). conversion_test.go:45: expected 100, got 200. FAIL. exit status 1.",
+    "important_bits": ["FAIL", "conversion_test.go", "45", "200"]
+  },
+  {
+    "category": "Server Logs",
+    "name": "Nginx Access",
+    "input": "127.0.0.1 - - [30/Mar/2026:18:00:01 +0000] \"GET /api/v1/users HTTP/1.1\" 200 1243 \"-\" \"Mozilla/5.0\"",
+    "important_bits": ["127.0.0.1", "/api/v1/users", "200"]
+  },
+  {
+    "category": "Server Logs",
+    "name": "Auth Error",
+    "input": "AUTH_ERROR: Failed login attempt for user 'admin' from IP 192.168.1.50. reason: invalid_password. attempts: 3.",
+    "important_bits": ["AUTH_ERROR", "admin", "192.168.1.50", "invalid_password"]
+  },
+  {
+    "category": "Server Logs",
+    "name": "JSON Log",
+    "input": "{\"level\":\"info\",\"ts\":1711821600,\"msg\":\"request processed\",\"path\":\"/health\",\"status\":200,\"latency_ms\":5}",
+    "important_bits": ["/health", "200", "5"]
+  },
+  {
+    "category": "Server Logs",
+    "name": "Slow Query",
+    "input": "SLOW_QUERY: SELECT * FROM orders WHERE user_id = 500. duration: 1500ms. rows: 50000.",
+    "important_bits": ["SLOW_QUERY", "orders", "1500ms"]
+  },
+  {
+    "category": "Server Logs",
+    "name": "K8s Health",
+    "input": "kubelet: Readiness probe failed: HTTP probe failed with statuscode: 500. pod: transmutation-proxy-xyz. node: worker-1.",
+    "important_bits": ["Readiness", "failed", "500", "transmutation-proxy-xyz"]
+  },
+  {
+    "category": "Code",
+    "name": "Rust Impl",
+    "input": "impl DocumentConverter for PdfConverter { async fn convert(&self, path: &Path) -> Result<ConversionResult> { let pdf = lopdf::Document::load(path)?; Ok(pdf) } }",
+    "important_bits": ["PdfConverter", "convert", "lopdf"]
+  },
+  {
+    "category": "Code",
+    "name": "Python Class",
+    "input": "class DataProxy: \"\"\"A proxy for data streams\"\"\" def __init__(self, limit: int): self.limit = limit. def stream(self): return self.data[:self.limit]",
+    "important_bits": ["DataProxy", "__init__", "limit"]
+  },
+  {
+    "category": "Code",
+    "name": "JS Component",
+    "input": "const Button = ({ label, onClick }) => { return <button onClick={onClick}>{label}</button>; }; export default Button;",
+    "important_bits": ["Button", "label", "onClick"]
+  },
+  {
+    "category": "Code",
+    "name": "Go Interface",
+    "input": "type Storage interface { Read(key string) ([]byte, error). Write(key string, data []byte) error. }",
+    "important_bits": ["Storage", "Read", "Write"]
+  },
+  {
+    "category": "Code",
+    "name": "SQL Schema",
+    "input": "CREATE TABLE users ( id SERIAL PRIMARY KEY, email VARCHAR(255) UNIQUE NOT NULL, created_at TIMESTAMP DEFAULT NOW() );",
+    "important_bits": ["users", "SERIAL", "email"]
+  },
+  {
+    "category": "Grep Results",
+    "name": "Path Search",
+    "input": "src/lib.rs:45: pub fn convert. src/bin/main.rs:12: let c = Converter::new(). src/utils/mod.rs:2: pub use file_detect;",
+    "important_bits": ["src/lib.rs", "convert", "src/bin/main.rs"]
+  },
+  {
+    "category": "Grep Results",
+    "name": "Secret Scan",
+    "input": ".env:12: API_KEY=sk-1234567890. config.yaml:5: secret: \"my-secret-token\". README.md:1: # Project Secret",
+    "important_bits": ["API_KEY", "sk-1234567890", "secret"]
+  },
+  {
+    "category": "Grep Results",
+    "name": "TODO List",
+    "input": "src/converters/pdf.rs:89: // TODO: fix OOM. src/converters/txt.rs:10: // FIXME: newline bug. tests/integration.rs:1: // TODO: add more tests",
+    "important_bits": ["OOM", "newline", "FIXME"]
+  },
+  {
+    "category": "Grep Results",
+    "name": "Imports",
+    "input": "Cargo.toml:5: tokio = \"1.0\". Cargo.toml:6: serde = \"1.0\". Cargo.toml:10: lopdf = \"0.35\"",
+    "important_bits": ["tokio", "serde", "lopdf"]
+  },
+  {
+    "category": "Grep Results",
+    "name": "Errors",
+    "input": "logs/app.log: error: db down. logs/app.log: error: timeout. logs/sys.log: kernel panic at 0x00123",
+    "important_bits": ["error", "panic", "0x00123"]
+  },
+  {
+    "category": "LLM Prompt",
+    "name": "Instruction",
+    "input": "You are a senior Rust engineer. Follow these rules: 1. No unsafe code. 2. Deny panics. 3. Use async where possible. Respond concisely.",
+    "important_bits": ["senior", "Rust", "unsafe", "async"]
+  },
+  {
+    "category": "LLM Prompt",
+    "name": "Conversation",
+    "input": "User: how do I fix OOM? Assistant: You should use streaming. User: show me the code. Assistant: here is the implementation.",
+    "important_bits": ["OOM", "Assistant", "streaming"]
+  },
+  {
+    "category": "LLM Prompt",
+    "name": "XML Wrapped",
+    "input": "<context> Here is the file: <file> src/main.rs </file> </context> <instruction> Refactor this class </instruction>",
+    "important_bits": ["context", "src/main.rs", "instruction"]
+  },
+  {
+    "category": "LLM Prompt",
+    "name": "Few Shot",
+    "input": "Example 1: a -> b. Example 2: c -> d. Example 3: e -> f. Now do: x -> ?",
+    "important_bits": ["Example", "Now", "do"]
+  },
+  {
+    "category": "LLM Prompt",
+    "name": "System Log",
+    "input": "System: initialized. Mode: streaming. Version: 0.4.0. Status: healthy. Ready for input.",
+    "important_bits": ["Mode", "0.4.0", "Status"]
+  },
+  {
+    "category": "SQL Logs",
+    "name": "Complex Join",
+    "input": "SELECT u.email, o.total FROM users u JOIN orders o ON u.id = o.user_id WHERE o.total > 1000 ORDER BY o.created_at DESC;",
+    "important_bits": ["JOIN", "orders", "1000", "DESC"]
+  },
+  {
+    "category": "SQL Logs",
+    "name": "Insert Multi",
+    "input": "INSERT INTO logs (level, msg) VALUES ('info', 'started'), ('warn', 'slow'), ('error', 'failed');",
+    "important_bits": ["INSERT", "logs", "VALUES"]
+  },
+  {
+    "category": "SQL Logs",
+    "name": "Constraint Fail",
+    "input": "ERROR: duplicate key value violates unique constraint \"users_email_key\". DETAIL: Key (email)=(test@example.com) already exists.",
+    "important_bits": ["duplicate", "unique", "users_email_key", "test@example.com"]
+  },
+  {
+    "category": "SQL Logs",
+    "name": "Migration",
+    "input": "BEGIN; ALTER TABLE users ADD COLUMN phone VARCHAR(20); CREATE INDEX idx_users_phone ON users(phone); COMMIT;",
+    "important_bits": ["ALTER", "ADD", "INDEX"]
+  },
+  {
+    "category": "SQL Logs",
+    "name": "Drop Table",
+    "input": "DROP TABLE legacy_data; TRUNCATE audit_logs; VACUUM ANALYZE;",
+    "important_bits": ["DROP", "TRUNCATE", "VACUUM"]
+  },
+  {
+    "category": "Git Output",
+    "name": "Git Diff",
+    "input": "--- a/src/lib.rs. +++ b/src/lib.rs. @@ -10,5 +10,6 @@. - let x = 1;. + let x = 2;. + let y = 3;",
+    "important_bits": ["src/lib.rs", "let", "x", "y"]
+  },
+  {
+    "category": "Git Output",
+    "name": "Git Log",
+    "input": "commit 31d6ae6. Author: ericdigr. Date: Mon Mar 30. feat(cli): Implement magic byte sniffing",
+    "important_bits": ["31d6ae6", "ericdigr", "sniffing"]
+  },
+  {
+    "category": "Git Output",
+    "name": "Git Status",
+    "input": "On branch main. Changes not staged for commit: modified: src/bin/transmutation.rs. Untracked files: examples/test.rs",
+    "important_bits": ["modified", "src/bin/transmutation.rs", "untracked"]
+  },
+  {
+    "category": "Git Output",
+    "name": "Git Pull",
+    "input": "Updating 934c1b0..31d6ae6. Fast-forward. src/bin/transmutation.rs | 36 ++++++++++++++++-. 1 file changed, 30 insertions(+), 6 deletions(-)",
+    "important_bits": ["Fast-forward", "insertions", "deletions"]
+  },
+  {
+    "category": "Git Output",
+    "name": "Git Remote",
+    "input": "origin  https://github.com/hivellm/transmutation.git (fetch). origin  https://github.com/hivellm/transmutation.git (push)",
+    "important_bits": ["origin", "github.com", "push"]
+  }
+]

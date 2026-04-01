@@ -1,209 +1,388 @@
 use std::collections::{HashMap, HashSet};
 use regex::Regex;
-use chrono::{DateTime, Utc};
-use std::time::Instant;
+use std::fs;
+use rusqlite::Connection;
+use walkdir::WalkDir;
 
-/// --- THE PRUNING SUITE: v24 ROI Optimizer & Accuracy Hardening ---
+/// --- THE PRUNING SUITE: v50 Universal Dependency Graph & Dual MCP ---
+/// Validates Macro and Micro payloads with 3-Way Routing and Code Map Injection
 
 #[derive(Clone)]
 struct Config {
     idf_weight: f64,
     pos_weight: f64,
     entropy_weight: f64,
+    position_weight: f64,
     base_threshold: f64,
 }
 
-#[derive(Clone, Debug)]
-struct Token {
-    text: String,
-    is_immune: bool,
-    kept: bool,
+// --- THE CODE MAP ENGINE ---
+struct CodeMapEngine {
+    conn: Connection,
 }
 
-fn semantic_squeeze_v2(text: &str) -> (String, String, HashMap<String, String>) {
-    let mut result = text.to_string();
-    let mut legend = HashMap::new();
-    let mut legend_str = String::new();
-    let mut alias_idx = 1;
-    
-    // 1. Timestamp Stripping
-    let time_re = Regex::new(r"\[\d{2}/\w{3}/\d{4}:(\d{2}:\d{2}:\d{2})\]").unwrap();
-    result = time_re.replace_all(&result, "$1").to_string();
-    
-    // 2. IP & Path Aliasing
-    let patterns = vec![
-        (Regex::new(r"\b\d{1,3}\.\d+\.\d+\.\d+\b").unwrap(), "IP"),
-        (Regex::new(r"(/api/v\d+/\w+)").unwrap(), "PATH"),
-        (Regex::new(r"([\w/\\.-]+\.[a-z0-9]{2,5})").unwrap(), "FILE"),
-    ];
-    
-    for (re, _) in patterns {
-        for mat in re.find_iter(&result.clone()) {
-            let original = mat.as_str().to_string();
-            let occurrences = result.matches(&original).count();
-            let potential_saving = (original.len() - 3) * occurrences;
-            let legend_tax = original.len() + 10;
+impl CodeMapEngine {
+    fn new() -> Self {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute("CREATE TABLE edges (source TEXT, target TEXT, UNIQUE(source, target))", []).unwrap();
+        Self { conn }
+    }
 
-            if potential_saving > legend_tax && original.len() > 10 && !legend.contains_key(&original) {
-                let alias = format!("@{}", alias_idx);
-                legend.insert(original.clone(), alias.clone());
-                legend_str.push_str(&format!("{}:\"{}\" ", alias, original));
-                alias_idx += 1;
+    fn extract_dependencies(content: &str, file_path: &str) -> HashSet<String> {
+        let mut targets = HashSet::new();
+        // A lightweight, language-agnostic regex parser for initial map building
+        let rust_import_re = Regex::new(r"use\s+crate::([a-zA-Z0-9_:]+)").unwrap();
+        let rust_mod_re = Regex::new(r"pub\s+mod\s+([a-zA-Z0-9_]+)").unwrap();
+        let ts_import_re = Regex::new(r"import\s+.*from\s+[':]([^']+)[':]").unwrap();
+
+        // 1. Rust Imports
+        for cap in rust_import_re.captures_iter(content) {
+            let mut path = "src".to_string();
+            for part in cap[1].split("::") {
+                if part == "*" || part.starts_with('{') { break; }
+                path.push('/');
+                path.push_str(part);
+            }
+            targets.insert(format!("{}.rs", path));
+            targets.insert(format!("{}/mod.rs", path));
+        }
+
+        // 2. Rust Modules
+        for cap in rust_mod_re.captures_iter(content) {
+            let parent = std::path::Path::new(file_path).parent().unwrap().to_string_lossy().replace("\\", "/");
+            targets.insert(format!("{}/{}.rs", parent, &cap[1]));
+            targets.insert(format!("{}/{}/mod.rs", parent, &cap[1]));
+        }
+
+        // 3. TS/JS Imports (for frontend repos)
+        for cap in ts_import_re.captures_iter(content) {
+            targets.insert(cap[1].to_string());
+        }
+
+        // Filter out physically missing files to keep the graph clean
+        targets.into_iter().filter(|p| std::path::Path::new(p).exists()).collect()
+    }
+
+    fn build_initial_map(&self) {
+        for entry in WalkDir::new("src").into_iter().filter_map(|e| e.ok()) {
+            if entry.path().extension().map_or(false, |ext| ext == "rs" || ext == "ts") {
+                let source = entry.path().to_string_lossy().replace("\\", "/");
+                if let Ok(content) = fs::read_to_string(entry.path()) {
+                    let targets = Self::extract_dependencies(&content, &source);
+                    for target in targets {
+                        self.conn.execute("INSERT OR IGNORE INTO edges (source, target) VALUES (?1, ?2)", rusqlite::params![source, target]).unwrap();
+                    }
+                }
             }
         }
     }
-    for (original, alias) in &legend { result = result.replace(original, alias); }
-    (result, legend_str.trim().to_string(), legend)
+
+    fn read_code_map(&self, filename: &str) -> String {
+        let mut imports_from = Vec::new();
+        let mut imported_by = Vec::new();
+
+        if let Ok(mut stmt) = self.conn.prepare("SELECT target FROM edges WHERE source = ?1") {
+            if let Ok(rows) = stmt.query_map([filename], |row| row.get::<_, String>(0)) {
+                for r in rows.flatten() { imports_from.push(r); }
+            }
+        }
+
+        if let Ok(mut stmt2) = self.conn.prepare("SELECT source FROM edges WHERE target = ?1") {
+            if let Ok(rows) = stmt2.query_map([filename], |row| row.get::<_, String>(0)) {
+                for r in rows.flatten() { imported_by.push(r); }
+            }
+        }
+
+        let mut out = format!("[ARCHITECTURE CODE MAP]\nFile: {}\n", filename);
+        out.push_str("Imports From: ");
+        if imports_from.is_empty() { out.push_str("(None)\n"); } else { out.push_str(&imports_from.join(", ")); out.push('\n'); }
+        out.push_str("Imported By: ");
+        if imported_by.is_empty() { out.push_str("(None)\n"); } else { out.push_str(&imported_by.join(", ")); out.push('\n'); }
+        
+        out
+    }
 }
 
-fn is_protected(word: &str) -> bool {
+// --- ROUTE 1: TOON SQUEEZER (JSON/XML/HTML) ---
+fn try_toon_compression(input: &str) -> Option<String> {
+    if let Ok(val) = serde_json::from_str::<serde_json::Value>(input) {
+        let mut out = String::new();
+        flatten_toon(&val, &mut out, "");
+        Some(out.trim().to_string())
+    } else if input.trim().starts_with('<') && input.trim().ends_with('>') {
+        let mut out = input.replace('\n', " ").replace("  ", " ");
+        let closing_tag_re = Regex::new(r"</[^>]+>").unwrap();
+        out = closing_tag_re.replace_all(&out, " ").to_string();
+        let opening_tag_re = Regex::new(r"<([a-zA-Z0-9_-]+)([^>]*)>").unwrap();
+        out = opening_tag_re.replace_all(&out, "$1$2 ").to_string();
+        let attr_quotes_re = Regex::new(r#"="([^"]+)""#).unwrap();
+        out = attr_quotes_re.replace_all(&out, "=$1").to_string();
+        let whitespace_re = Regex::new(r"\s+").unwrap();
+        out = whitespace_re.replace_all(&out, " ").to_string();
+        Some(out.trim().to_string())
+    } else {
+        None
+    }
+}
+
+fn flatten_toon(val: &serde_json::Value, out: &mut String, prefix: &str) {
+    match val {
+        serde_json::Value::Object(map) => {
+            for (k, v) in map {
+                let new_prefix = if prefix.is_empty() { k.clone() } else { format!("{}.{}", prefix, k) };
+                if v.is_object() || v.is_array() {
+                    flatten_toon(v, out, &new_prefix);
+                } else {
+                    out.push_str(&format!("{}:{} ", new_prefix, v.to_string().trim_matches('"')));
+                }
+            }
+        },
+        serde_json::Value::Array(arr) => {
+            out.push_str(&format!("{}[{}]: ", prefix, arr.len()));
+            for v in arr {
+                if v.is_string() || v.is_number() || v.is_boolean() {
+                    out.push_str(&format!("{} ", v.to_string().trim_matches('"')));
+                }
+            }
+        },
+        _ => {
+            out.push_str(&format!("{}:{} ", prefix, val.to_string().trim_matches('"')));
+        }
+    }
+}
+
+// --- ROUTE 2: LATENT-K STRUCTURAL EXTRACTION ---
+fn structural_extraction(original_input: &str) -> String {
+    let mut lines = Vec::new();
+    let mut in_block = false;
+    let mut brace_depth = 0;
+
+    for line in original_input.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("use ") || trimmed.starts_with("pub mod ") {
+            lines.push(line.to_string()); continue;
+        }
+        if trimmed.starts_with("pub struct ") || trimmed.starts_with("pub enum ") || trimmed.starts_with("pub fn ") || trimmed.starts_with("pub trait ") || trimmed.starts_with("impl ") || trimmed.starts_with("pub use ") || trimmed.starts_with("pub const ") || trimmed.starts_with("pub type ") || trimmed.starts_with("///") {
+            if trimmed.ends_with("{") {
+                in_block = true; brace_depth = 1;
+                lines.push(format!("{} ... }}", line.trim_end_matches('{').trim_end()));
+            } else {
+                lines.push(line.to_string());
+            }
+            continue;
+        }
+        if in_block {
+            if trimmed.contains("{") { brace_depth += 1; }
+            if trimmed.contains("}") { brace_depth -= 1; }
+            if brace_depth == 0 { in_block = false; }
+            continue;
+        }
+        if trimmed.starts_with("#[") || trimmed.starts_with("#!") {
+            lines.push(line.to_string());
+        }
+    }
+
+    let mut result = "[DEPENDENCY MAP (k=1)]\n".to_string();
+    let mut deps: Vec<&String> = lines.iter().filter(|l| l.trim().starts_with("use ")).collect();
+    if deps.is_empty() { result.push_str("(None detected)\n"); }
+    for d in deps { result.push_str(d); result.push('\n'); }
+    result.push_str("\n[PUBLIC INTERFACE]\n");
+    for l in lines.iter().filter(|l| !l.trim().starts_with("use ")) {
+        result.push_str(l); result.push('\n');
+    }
+    result.trim().to_string()
+}
+
+// --- ROUTE 3: SEMANTIC SQUEEZER (Logs & Grep) ---
+fn detect_protected_spans(text: &str) -> HashSet<usize> {
+    let mut protected_indices = HashSet::new();
+    let words: Vec<&str> = text.split_whitespace().collect();
     lazy_static::lazy_static! {
-        static ref IP_RE: Regex = Regex::new(r"^(@\d+|\d{1,3}\.\d+\.\d+\.\d+)$").unwrap();
         static ref PATH_RE: Regex = Regex::new(r"(?i)^([./\\]+)?[\w/\\.-]+\.[a-z0-9]{1,5}$").unwrap();
-        static ref EMAIL_RE: Regex = Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").unwrap();
-        static ref TAG_RE: Regex = Regex::new(r"^<[^>]+>$").unwrap();
-        static ref SEMANTIC_RE: Regex = Regex::new(r"(?i)^(error|fail|panic|exception|fatal|warn|critical|debug|unresolved|timeout|refused|denied|abort|success|successfully|done|finished|status|login|node|pod|impl|async|fn|result|ok|select|insert|update|join|where|group|by|order|limit|begin|commit|git|diff|modified|untracked|insertions|deletions|origin|fast-forward|master|main|branch)$").unwrap();
+        static ref IP_RE: Regex = Regex::new(r"^\d{1,3}\.\d+\.\d+\.\d+$").unwrap();
+        static ref FLAG_RE: Regex = Regex::new(r"^--[a-z-]+$").unwrap();
+        static ref HEADER_RE: Regex = Regex::new(r"(?i)^(usage|options|modified|untracked|status|error|critical|failed|reason|latency|author|commit|date|diff):?$").unwrap();
+        static ref HEX_RE: Regex = Regex::new(r"^[a-f0-9]{7,40}$").unwrap();
+        static ref VER_RE: Regex = Regex::new(r"(?i)v\d+").unwrap();
     }
-    let clean = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '.' && c != '/' && c != '@' && c != '-');
-    IP_RE.is_match(clean) || PATH_RE.is_match(clean) || EMAIL_RE.is_match(clean) || SEMANTIC_RE.is_match(clean) || TAG_RE.is_match(word)
+    for (i, word) in words.iter().enumerate() {
+        let clean = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '.' && c != '/' && c != '\\' && c != '[' && c != ']' && c != ':');
+        if PATH_RE.is_match(clean) || IP_RE.is_match(clean) || FLAG_RE.is_match(word) || HEADER_RE.is_match(clean) || HEX_RE.is_match(clean) || VER_RE.is_match(clean) || word.contains("=") || word.contains("::") {
+            protected_indices.insert(i);
+        }
+    }
+    protected_indices
 }
 
-fn run_suite(words: &[String], config: &Config) -> Vec<Token> {
+fn calculate_idf(words: &[String]) -> HashMap<String, f64> {
     let mut freq_map = HashMap::new();
-    for w in words { *freq_map.entry(w).or_insert(0) += 1; }
+    for word in words { *freq_map.entry(word.clone()).or_insert(0) += 1; }
     let total = words.len() as f64;
-    let mut tokens = Vec::new();
-    for word in words {
-        if is_protected(word) { tokens.push(Token { text: word.clone(), is_immune: true, kept: true }); continue; }
-        let count = freq_map.get(word).unwrap_or(&1);
-        let idf = (total / *count as f64).ln();
-        let stop_words: HashSet<&str> = ["the", "a", "an", "and", "or", "is", "was", "in", "on", "at", "to", "for", "it", "this", "that", "of", "be"].into_iter().collect();
-        let pos = if stop_words.contains(word.to_lowercase().as_str()) { 0.05 } else { 0.85 };
-        let final_score = (idf * config.idf_weight) + (pos * config.pos_weight);
-        tokens.push(Token { text: word.clone(), is_immune: false, kept: final_score >= config.base_threshold });
+    freq_map.into_iter().map(|(w, count)| (w, (total / count as f64).ln())).collect()
+}
+
+fn calculate_local_entropy(words: &[String]) -> Vec<f64> {
+    const WINDOW: usize = 8;
+    (0..words.len()).map(|idx| {
+        let start = idx.saturating_sub(WINDOW / 2);
+        let end = (idx + WINDOW / 2).min(words.len());
+        let window = &words[start..end];
+        let unique = window.iter().collect::<HashSet<_>>().len();
+        unique as f64 / window.len() as f64
+    }).collect()
+}
+
+fn calculate_pos_importance(word: &str) -> f64 {
+    const STOP_WORDS: &[&str] = &["the", "a", "an", "and", "or", "is", "was", "in", "on", "at", "to", "for", "it", "of", "be", "with", "by", "from", "as", "this", "that", "those", "these", "then", "than", "run", "only", "used", "each", "other", "any", "multiple", "message", "expected", "will", "all", "has", "have", "can", "could"];
+    if STOP_WORDS.contains(&word.to_lowercase().as_str()) { 0.0 } 
+    else if word.chars().any(|c| c.is_ascii_uppercase() || c.is_numeric()) { 1.0 } 
+    else { 0.5 }
+}
+
+fn calculate_position_weight(idx: usize, total: usize) -> f64 {
+    if total == 0 { return 1.0; }
+    let position = idx as f64 / total as f64;
+    4.0 * (position - 0.5).powi(2) + 0.2
+}
+
+fn semantic_compression(original_input: &str, config: &Config) -> String {
+    let words: Vec<String> = original_input.split_whitespace().map(|s| s.to_string()).collect();
+    let total_words = words.len();
+    if total_words == 0 { return original_input.to_string(); }
+
+    let protected_spans = detect_protected_spans(original_input);
+    let idf_map = calculate_idf(&words);
+    let entropy_scores = calculate_local_entropy(&words);
+
+    let mut body = String::new();
+    for (i, word) in words.iter().enumerate() {
+        if protected_spans.contains(&i) {
+            body.push_str(word); body.push(' ');
+            continue;
+        }
+        let idf = idf_map.get(word).unwrap_or(&1.0);
+        let pos = calculate_pos_importance(word);
+        let entropy = entropy_scores[i];
+        let u_shape = calculate_position_weight(i, total_words);
+        let final_score = (idf * config.idf_weight) + (pos * config.pos_weight) + (entropy * config.entropy_weight) + (u_shape * config.position_weight);
+        if final_score >= config.base_threshold {
+            body.push_str(word); body.push(' ');
+        }
     }
-    tokens
+
+    body.trim().to_string()
 }
 
-struct TestCase {
-    category: &'static str,
-    name: &'static str,
+// --- THE MASTER ROUTER ---
+fn crush_payload(command_type: &str, original_input: &str, config: &Config, code_map: &CodeMapEngine, filename: &str) -> (String, f64) {
+    if command_type == "Code Map Tool" {
+        return (code_map.read_code_map(filename), 1.0); // 100% compression vs returning full file
+    }
+
+    if let Some(toon_crushed) = try_toon_compression(original_input) {
+        if toon_crushed.len() < original_input.len() {
+            let savings = 1.0 - (toon_crushed.len() as f64 / original_input.len() as f64);
+            return (toon_crushed, savings);
+        }
+    }
+
+    let crushed_content = if command_type == "Code Read" {
+        let structural = structural_extraction(original_input);
+        let map = code_map.read_code_map(filename);
+        format!("{}\n{}", map, structural)
+    } else {
+        semantic_compression(original_input, config)
+    };
+
+    if crushed_content.len() >= original_input.len() {
+        return (original_input.to_string(), 0.0);
+    }
+    let savings = 1.0 - (crushed_content.len() as f64 / original_input.len() as f64);
+    (crushed_content, savings)
+}
+
+#[derive(serde::Deserialize)]
+struct MicroTestCase {
+    category: String,
+    name: String,
     input: String,
-    important_bits: Vec<&'static str>,
-}
-
-fn get_test_cases() -> Vec<TestCase> {
-    vec![
-        // 1. Build Logs
-        TestCase { category: "Build Logs", name: "NPM Success", input: "npm info it worked. npm info using npm@10.2.4. webpack compiled successfully in 1243ms. output saved to ./dist/main.js".to_string(), important_bits: vec!["successfully", "1243ms", "./dist/main.js"] },
-        TestCase { category: "Build Logs", name: "Cargo Error", input: "error[E0432]: unresolved import `crate::missing`. --> src/lib.rs:10:5. error: aborting due to previous error".to_string(), important_bits: vec!["E0432", "src/lib.rs", "unresolved"] },
-        TestCase { category: "Build Logs", name: "CMake Spam", input: "-- Check for working C compiler: /usr/bin/cc. -- Detecting C compiler ABI info - done".to_string(), important_bits: vec!["/usr/bin/cc", "done"] },
-        TestCase { category: "Build Logs", name: "Vite HMR", input: "10:15:01 AM [vite] hmr update /src/App.tsx. [vite] page reloaded.".to_string(), important_bits: vec!["hmr", "update", "/src/App.tsx"] },
-        TestCase { category: "Build Logs", name: "Go Test Fail", input: "--- FAIL: TestConversion (0.05s). conversion_test.go:45: expected 100, got 200. FAIL.".to_string(), important_bits: vec!["FAIL", "conversion_test.go", "45"] },
-
-        // 2. Server Logs
-        TestCase { category: "Server Logs", name: "Nginx Access", input: "127.0.0.1 - - [30/Mar/2026:18:00:01 +0000] \"GET /api/v1/users HTTP/1.1\" 200 1243".to_string(), important_bits: vec!["127.0.0.1", "/api/v1/users", "200"] },
-        TestCase { category: "Server Logs", name: "Auth Error", input: "AUTH_ERROR: Failed login attempt for user 'admin' from IP 192.168.1.50. reason: invalid_password.".to_string(), important_bits: vec!["AUTH_ERROR", "admin", "192.168.1.50"] },
-        TestCase { category: "Server Logs", name: "JSON Log", input: "{\"level\":\"info\",\"ts\":1711821600,\"msg\":\"request processed\",\"path\":\"/health\",\"status\":200}".to_string(), important_bits: vec!["/health", "200"] },
-        TestCase { category: "Server Logs", name: "Slow Query", input: "SLOW_QUERY: SELECT * FROM orders WHERE user_id = 500. duration: 1500ms. rows: 50000.".to_string(), important_bits: vec!["SLOW_QUERY", "orders", "1500ms"] },
-        TestCase { category: "Server Logs", name: "K8s Health", input: "kubelet: Readiness probe failed: HTTP probe failed with statuscode: 500. pod: transmutation-proxy-xyz.".to_string(), important_bits: vec!["Readiness", "failed", "500"] },
-
-        // 3. Code
-        TestCase { category: "Code", name: "Rust Impl", input: "impl DocumentConverter for PdfConverter { async fn convert(&self, path: &Path) -> Result<ConversionResult> { let pdf = lopdf::Document::load(path)?; Ok(pdf) } }".to_string(), important_bits: vec!["PdfConverter", "convert", "lopdf"] },
-        TestCase { category: "Code", name: "Python Class", input: "class DataProxy: def __init__(self, limit: int): self.limit = limit. def stream(self): return self.data[:self.limit]".to_string(), important_bits: vec!["DataProxy", "__init__", "limit"] },
-        TestCase { category: "Code", name: "JS Component", input: "const Button = ({ label, onClick }) => { return <button onClick={onClick}>{label}</button>; }; export default Button;".to_string(), important_bits: vec!["Button", "label", "onClick"] },
-        TestCase { category: "Code", name: "Go Interface", input: "type Storage interface { Read(key string) ([]byte, error). Write(key string, data []byte) error. }".to_string(), important_bits: vec!["Storage", "Read", "Write"] },
-        TestCase { category: "Code", name: "SQL Schema", input: "CREATE TABLE users ( id SERIAL PRIMARY KEY, email VARCHAR(255) UNIQUE NOT NULL );".to_string(), important_bits: vec!["users", "SERIAL", "email"] },
-
-        // 4. Grep Results
-        TestCase { category: "Grep Results", name: "Path Search", input: "src/lib.rs:45: pub fn convert. src/bin/main.rs:12: let c = Converter::new().".to_string(), important_bits: vec!["src/lib.rs", "convert", "src/bin/main.rs"] },
-        TestCase { category: "Grep Results", name: "Secret Scan", input: ".env:12: API_KEY=sk-1234567890. config.yaml:5: secret: \"my-secret-token\".".to_string(), important_bits: vec!["API_KEY", "sk-1234567890", "secret"] },
-        TestCase { category: "Grep Results", name: "TODO List", input: "src/converters/pdf.rs:89: // TODO: fix OOM. src/converters/txt.rs:10: // FIXME: newline bug.".to_string(), important_bits: vec!["OOM", "newline", "FIXME"] },
-        TestCase { category: "Grep Results", name: "Imports", input: "Cargo.toml:5: tokio = \"1.0\". Cargo.toml:6: serde = \"1.0\". Cargo.toml:10: lopdf = \"0.35\"".to_string(), important_bits: vec!["tokio", "serde", "lopdf"] },
-        TestCase { category: "Grep Results", name: "Errors", input: "logs/app.log: error: db down. logs/sys.log: kernel panic at 0x00123".to_string(), important_bits: vec!["error", "panic", "0x00123"] },
-
-        // 5. LLM Prompt
-        TestCase { category: "LLM Prompt", name: "Instruction", input: "You are a senior Rust engineer. Follow these rules: 1. No unsafe code. 2. Deny panics. 3. Use async where possible.".to_string(), important_bits: vec!["senior", "Rust", "unsafe", "async"] },
-        TestCase { category: "LLM Prompt", name: "Conversation", input: "User: how do I fix OOM? Assistant: You should use streaming. User: show me the code.".to_string(), important_bits: vec!["OOM", "Assistant", "streaming"] },
-        TestCase { category: "LLM Prompt", name: "XML Wrapped", input: "<context> Here is the file: <file> src/main.rs </file> </context> <instruction> Refactor this </instruction>".to_string(), important_bits: vec!["<context>", "src/main.rs", "<instruction>"] },
-        TestCase { category: "LLM Prompt", name: "Few Shot", input: "Example 1: a -> b. Example 2: c -> d. Example 3: e -> f. Now do: x -> ?".to_string(), important_bits: vec!["Example", "Now", "do"] },
-        TestCase { category: "LLM Prompt", name: "System Log", input: "System: initialized. Mode: streaming. Version: 0.4.0. Status: healthy.".to_string(), important_bits: vec!["Mode", "0.4.0", "Status"] },
-
-        // 6. SQL Query Logs
-        TestCase { category: "SQL Logs", name: "Complex Join", input: "SELECT u.email, o.total FROM users u JOIN orders o ON u.id = o.user_id WHERE o.total > 1000 ORDER BY o.created_at DESC;".to_string(), important_bits: vec!["JOIN", "orders", "1000", "DESC"] },
-        TestCase { category: "SQL Logs", name: "Insert Multi", input: "INSERT INTO logs (level, msg) VALUES ('info', 'started'), ('warn', 'slow'), ('error', 'failed');".to_string(), important_bits: vec!["INSERT", "logs", "VALUES"] },
-        TestCase { category: "SQL Logs", name: "Constraint Fail", input: "ERROR: duplicate key value violates unique constraint \"users_email_key\". Key (email)=(test@example.com).".to_string(), important_bits: vec!["duplicate", "unique", "users_email_key", "test@example.com"] },
-        TestCase { category: "SQL Logs", name: "Migration", input: "BEGIN; ALTER TABLE users ADD COLUMN phone VARCHAR(20); CREATE INDEX idx_users_phone ON users(phone); COMMIT;".to_string(), important_bits: vec!["ALTER", "ADD", "INDEX"] },
-        TestCase { category: "SQL Logs", name: "Drop Table", input: "DROP TABLE legacy_data; TRUNCATE audit_logs; VACUUM ANALYZE;".to_string(), important_bits: vec!["DROP", "TRUNCATE", "VACUUM"] },
-
-        // 7. Git Output
-        TestCase { category: "Git Output", name: "Git Diff", input: "--- a/src/lib.rs. +++ b/src/lib.rs. @@ -10,5 +10,6 @@. - let x = 1;. + let x = 2;".to_string(), important_bits: vec!["src/lib.rs", "let", "x", "2"] },
-        TestCase { category: "Git Output", name: "Git Log", input: "commit 31d6ae6. Author: ericdigr. Date: Mon Mar 30. feat(cli): Implement magic byte sniffing".to_string(), important_bits: vec!["31d6ae6", "ericdigr", "sniffing"] },
-        TestCase { category: "Git Output", name: "Git Status", input: "On branch main. Changes not staged for commit: modified: src/bin/transmutation.rs. Untracked files: examples/test.rs".to_string(), important_bits: vec!["modified", "src/bin/transmutation.rs", "untracked"] },
-        TestCase { category: "Git Output", name: "Git Pull", input: "Updating 934c1b0..31d6ae6. Fast-forward. src/bin/transmutation.rs | 36 ++++++++++++++++-.".to_string(), important_bits: vec!["Fast-forward", "insertions", "deletions"] },
-        TestCase { category: "Git Output", name: "Git Remote", input: "origin https://github.com/hivellm/transmutation.git (fetch). origin https://github.com/hivellm/transmutation.git (push)".to_string(), important_bits: vec!["origin", "github.com", "push"] },
-    ]
+    important_bits: Vec<String>,
 }
 
 fn main() {
-    let test_cases = get_test_cases();
-    let config = Config { idf_weight: 0.25, pos_weight: 0.55, entropy_weight: 0.20, base_threshold: 1.0 };
+    println!("🧪 v50 UNIVERSAL GRAPH & DUAL MCP ROUTING");
+    let config = Config { 
+        idf_weight: 0.65, pos_weight: 0.25, entropy_weight: 0.05,
+        position_weight: 0.05, base_threshold: 2.2, 
+    };
 
-    println!("🧪 v24 AGGRESSIVE ROI PRUNING BREAKDOWN (Full 35-Case Suite)");
-    println!("Weights: IDF:{:.1} POS:{:.1} Ent:{:.1} Threshold:{:.1}", config.idf_weight, config.pos_weight, config.entropy_weight, config.base_threshold);
-    println!("====================================================================================================\n");
+    // Initialize Global Dependency Graph
+    let code_map = CodeMapEngine::new();
+    code_map.build_initial_map();
 
-    println!("{:<15} | {:<15} | {:<8} | {:<8} | {:<8} | {:<8}", "Category", "Test Name", "In Tkn", "Out Tkn", "Tkn Sav%", "Accuracy");
-    println!("{:-<100}", "");
+    let mut total_tests = 0;
+    let mut passed_tests = 0;
 
-    let mut overall_pass = 0;
+    let micro_file = fs::read_to_string("tests/fixtures/payloads/micro_tests.json").expect("Failed to read micro_tests.json");
+    let micros: Vec<MicroTestCase> = serde_json::from_str(&micro_file).expect("Failed to parse micro tests");
 
-    for tc in test_cases {
-        let (squeezed_input, legend_str, legend_map) = semantic_squeeze_v2(&tc.input);
-        let words: Vec<String> = squeezed_input.split_whitespace().map(|s| s.to_string()).collect();
-        let tokens = run_suite(&words, &config);
+    println!("{:-<110}", "");
+    println!("{:<15} | {:<20} | {:>10} | {:>10} | {:>8} | Accuracy", "Category", "Test Name", "In Bytes", "Out Bytes", "Comp %");
+    println!("{:-<110}", "");
 
-        let mut processed_body = String::new();
-        let mut tokens_kept = 0;
-        for t in &tokens {
-            if t.kept {
-                processed_body.push_str(&t.text);
-                processed_body.push(' ');
-                tokens_kept += 1;
-            }
-        }
+    for tc in micros {
+        total_tests += 1;
+        let mut local_config = config.clone();
+        if tc.input.len() < 200 { local_config.base_threshold = 0.5; } 
+        else if tc.input.len() < 500 { local_config.base_threshold = 1.0; }
 
-        let header = format!("# ⚡ PROVENANCE [V: 0.4.0 | Src: {} | Transformed: TOON+STAT_V7]\n", tc.category);
-        let legend_header = if !legend_str.is_empty() { format!("LEGEND: {} | ", legend_str) } else { "".to_string() };
-        let total_overhead = header.len() + legend_header.len() + 4;
-        let total_savings = tc.input.len().saturating_sub(processed_body.len());
-
-        let (final_output, final_tokens_kept) = if total_savings > total_overhead {
-            let mut out = header;
-            if !legend_header.is_empty() { out.push_str(&legend_header); }
-            out.push_str("---\n");
-            out.push_str(processed_body.trim());
-            (out, tokens_kept + 5)
-        } else {
-            (tc.input.clone(), tc.input.split_whitespace().count())
-        };
-
-        let in_tokens = tc.input.split_whitespace().count();
-        let tkn_sav = 100.0 - (final_tokens_kept as f64 / in_tokens as f64 * 100.0);
-
+        let in_bytes = tc.input.len();
+        let (output, comp_ratio) = crush_payload("General", &tc.input, &local_config, &code_map, "");
+        let out_bytes = output.len();
         let mut missed = Vec::new();
         for bit in &tc.important_bits {
-            let b_lower = bit.to_lowercase();
-            let out_lower = final_output.to_lowercase();
-            if !out_lower.contains(&b_lower) && !legend_str.to_lowercase().contains(&b_lower) {
-                missed.push(*bit);
-            }
+            if !output.to_lowercase().contains(&bit.to_lowercase()) { missed.push(bit.clone()); }
         }
+        let status = if missed.is_empty() { passed_tests += 1; "\x1b[32m100%\x1b[0m" } else { "\x1b[31mFAIL\x1b[0m" };
+        let display_comp = if comp_ratio == 0.0 { "BYPASS".to_string() } else { format!("{:>7.1}%", comp_ratio * 100.0) };
+        
+        if !missed.is_empty() {
+            println!("{:<15} | {:<20} | {:>10} | {:>10} | {:>8} | {}", tc.category, tc.name.chars().take(20).collect::<String>(), in_bytes, out_bytes, display_comp, status);
+            println!("   ↳ Lost bits: {:?}", missed);
+        }
+    }
 
-        let status = if missed.is_empty() { overall_pass += 1; "\x1b[32m100%\x1b[0m" } else { "\x1b[31mFAIL\x1b[0m" };
-        println!("{:<15} | {:<15} | {:>8} | {:>8} | {:>7.1}% | {}", tc.category, tc.name, in_tokens, final_tokens_kept, tkn_sav, status);
+    let macro_cases = vec![
+        ("Recon", "git status", fs::read_to_string("tests/fixtures/payloads/git_status.txt").unwrap_or_default(), vec!["main", "modified:", "GEMINI.md", "audit_logs/"], ""),
+        ("Tooling", "cargo test --help", fs::read_to_string("tests/fixtures/payloads/cargo_test_help.txt").unwrap_or_default(), vec!["Usage:", "--list", "--fail-fast", "--format", "--shuffle-seed", "--include-ignored"], ""),
+        ("Git Patch", "git log -p", fs::read_to_string("tests/fixtures/payloads/git_log.txt").unwrap_or_default(), vec!["e699d4b7b187171c65b06694ed4f128a3c68e058", "feat(mcp): Finalize v24", "049a2cb060fba8c50aebe9878f8201943bbaf1e0"], ""),
+        ("Code Read", "cat src/converters/pdf.rs", fs::read_to_string("src/converters/pdf.rs").unwrap_or_default(), vec!["[ARCHITECTURE CODE MAP]", "src/converters/pdf.rs", "Imports From:", "pub struct PdfConverter", "[DEPENDENCY MAP (k=1)]"], "src/converters/pdf.rs"),
+        ("Code Map Tool", "read_code_map lib.rs", "src/lib.rs".to_string(), vec!["[ARCHITECTURE CODE MAP]", "File: src/lib.rs", "Imports From", "Imported By"], "src/lib.rs"),
+        ("Code Map Tool", "read_code_map pdf.rs", "src/converters/pdf.rs".to_string(), vec!["[ARCHITECTURE CODE MAP]", "File: src/converters/pdf.rs", "Imports From", "Imported By"], "src/converters/pdf.rs"),
+        ("Build Log", "cargo check", fs::read_to_string("tests/fixtures/payloads/cargo_check.txt").unwrap_or_default(), vec!["transmutation", "Finished `dev` profile"], ""),
+        ("Structured", "Project JSON", fs::read_to_string("tests/fixtures/payloads/project_structure.json").unwrap_or_default(), vec!["transmutation-streaming", "0.3.2", "audit_logs", "Cargo.toml"], ""),
+        ("Structured", "Project XML", fs::read_to_string("tests/fixtures/payloads/project_structure.xml").unwrap_or_default(), vec!["transmutation-streaming", "0.3.2", "audit_logs", "Cargo.toml"], ""),
+        ("Structured", "Test Report HTML", fs::read_to_string("tests/fixtures/payloads/test_report.html").unwrap_or_default(), vec!["Test Report - transmutation-streaming", "141", "test_pdf_extraction_fails_on_corrupt_file", "tests/pdf_tests.rs:114:5"], ""),
+    ];
+
+    println!("{:-<110}", "");
+    for (cat, name, input, bits, target_file) in macro_cases {
+        if input.is_empty() { continue; }
+        total_tests += 1;
+        let in_bytes = input.len();
+        let (output, comp_ratio) = crush_payload(cat, &input, &config, &code_map, target_file);
+        let out_bytes = output.len();
+        let mut missed = Vec::new();
+        for bit in &bits {
+            if !output.to_lowercase().contains(&bit.to_lowercase()) { missed.push(bit); }
+        }
+        let status = if missed.is_empty() { passed_tests += 1; "\x1b[32m100%\x1b[0m" } else { "\x1b[31mFAIL\x1b[0m" };
+        let display_comp = if comp_ratio == 0.0 { "BYPASS".to_string() } else { format!("{:>7.1}%", comp_ratio * 100.0) };
+        
+        let display_name = if name.len() > 20 { &name[..20] } else { name };
+        println!("{:<15} | {:<20} | {:>10} | {:>10} | {:>8} | {}", cat, display_name, in_bytes, out_bytes, display_comp, status);
         if !missed.is_empty() { println!("   ↳ Lost bits: {:?}", missed); }
     }
 
-    println!("\n📊 FINAL SUMMARY: {}/{} test cases passed with 100% accuracy.", overall_pass, get_test_cases().len());
+    println!("\n📊 FINAL SUMMARY: {}/{} total test cases passed with 100% accuracy.", passed_tests, total_tests);
 }

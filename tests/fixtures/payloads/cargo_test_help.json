@@ -1,0 +1,36 @@
+{
+  "must_preserve": [
+    "Usage: transmutation.exe [OPTIONS] [FILTERS...]",
+    "--include-ignored",
+    "--ignored",
+    "--force-run-in-process",
+    "--exclude-should-panic",
+    "--test",
+    "--bench",
+    "--list",
+    "--fail-fast",
+    "-h, --help",
+    "--logfile",
+    "--no-capture",
+    "--test-threads",
+    "--skip",
+    "-q, --quiet",
+    "--exact",
+    "--color",
+    "--format",
+    "pretty|terse|json|junit",
+    "--show-output",
+    "-Z unstable-options",
+    "--report-time",
+    "--ensure-time",
+    "--shuffle",
+    "--shuffle-seed"
+  ],
+  "can_prune": [
+    "Configure formatting of output",
+    "Display one character per test instead of one line",
+    "seed the random number generator with SEED"
+  ],
+  "expected_bypass": false,
+  "minimum_compression_ratio": 0.15
+}

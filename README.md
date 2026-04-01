@@ -20,18 +20,43 @@ Transmutation implements a Thompson NFA-based security firewall that evaluates c
 
 ## ⚡ Token Crushing: The Semantic Engine
 
-Transmutation doesn't just "truncate" text; it performs **Semantic Transmutation** using three integrated layers:
+Transmutation doesn't just "truncate" text; it performs **Semantic Transmutation** using several integrated algorithms to squeeze massive shell outputs into context-safe packets. 
 
-### 1. TOON (Token-Oriented Object Notation)
-Structural optimization for data formats. It strips quotes from JSON keys, minifies booleans (`true` -> `!t`), and collapses XML/HTML attributes to their bare identifiers.
+📖 **For an in-depth mathematical breakdown of how Transmutation uses Expectation-Maximization and TOON parsing, read the [Latent-K & TOON Architecture Guide](docs/latent-k.md).**
 
-### 2. Statistical Pruning (IDF + Entropy)
-Mathematical token reduction. It calculates the **Inverse Document Frequency (IDF)** and **Vocabulary Entropy** of every word.
-- **Locking**: Critical identifiers (IPs, Paths, Error codes) are "Immune" and never pruned.
-- **Squeezing**: Common "filler" verbs (`info`, `attempting`, `checking`) and stopwords are pruned based on a confidence threshold.
+### 🛠️ Dual MCP Tool Architecture
+Transmutation exposes two distinct Model Context Protocol (MCP) tools to the agent, providing a safety net against over-compression:
 
-### 3. Lexicon Legends (Lossless Aliasing)
-For repetitive technical data (like IPs or deep API paths), Transmutation aliases long strings into short 2-character codes (e.g., `@1`, `@2`) and prepends a **Legend** for the agent to decode. This allows 100% data recovery with up to 90% byte savings.
+1. **`execute_command` (Default)**: The primary tool. It runs the command, applies security gates, and aggressively crushes the output. If the output is compressed, it prepends a `# ⚡ PROVENANCE` header.
+2. **`execute_command_unaltered` (Escape Hatch)**: Runs the command and security gates, but completely **bypasses compression**. The agent is instructed to call this fallback tool ONLY if the default tool returns ambiguous, broken, or overly-pruned results.
+
+### 🧩 Routing & Latent-K Structural Extraction
+The engine dynamically routes output based on the command type:
+* **Logs & Searches (`cargo build`, `grep`)**: Routed to the statistical **Semantic Squeezer** (IDF, POS, Entropy).
+* **Code Reads (`cat`, `head`)**: Routed to **Structural Extraction**. Semantic compression destroys code syntax. Instead, Transmutation heavily crushes the file by pruning all implementation logic (everything inside `{ ... }`) and returning a **Latent-K Dependency Map (k=1)**. It extracts:
+  1. Outbound Dependencies (e.g., `use`, `import`).
+  2. The Public Interface (`pub fn`, `struct`, `class`).
+  *If the agent needs the exact implementation details, it must call `execute_command_unaltered`.*
+
+### 1. IDF Scoring (calculate_idf)
+* **How it works:** Inverse Document Frequency. It builds a global frequency map of all tokens in the stream. Words that appear constantly (like INFO, [DEBUG], or timestamp fragments) get a near-zero score. Words that appear rarely (like NullPointerException or 127.0.0.1) get a massive score spike.
+* **Maximum Compression Input:** Massive, repetitive server logs (e.g., 100MB of Nginx access logs). It safely drops the boilerplate while keeping the one line where a 500 error occurred.
+
+### 2. POS Heuristics (calculate_pos_importance)
+* **How it works:** Part-of-Speech / Stop-word tagging. It blindly penalizes "function words" (the, a, is, was, in, at) that glue sentences together but don't carry technical weight.
+* **Maximum Compression Input:** Highly verbose natural language outputs, such as reading an LLM's conversational prompt, READMEs, or heavily commented code.
+
+### 3. Local Entropy Analysis (calculate_local_entropy)
+* **How it works:** It uses a sliding window (e.g., 10 words) to measure vocabulary diversity. If the window contains 10 identical characters or repeating patterns (e.g., ........ or loading... loading...), entropy crashes to 0 and the section is pruned.
+* **Maximum Compression Input:** CLI outputs with progress bars, loading spinners, or CMake/NPM build logs that spam repetitive status updates.
+
+### 4. Structured Protection (detect_protected_spans)
+* **How it works:** A pre-computation pass that identifies rigid syntactical blocks (JSON payloads, absolute file paths, stack traces, base64 strings) and gives them an `f64::INFINITY` score to immune them from the other algorithms.
+* **Maximum Compression Input:** It doesn't compress; it protects. It is most effective when parsing structured API responses embedded inside messy server logs.
+
+### 5. U-Shaped Position Weighting
+* **How it works:** Applies a mathematical curve that heavily weights tokens at the very beginning (0-10%) and very end (90-100%) of the document, mitigating the LLM "Lost-in-the-Middle" effect.
+* **Maximum Compression Input:** Massive context dumps where the user's initial instruction is at the top, the error summary is at the bottom, and the middle is 50,000 lines of irrelevant log context.
 
 ## 🤖 Agentic Shell Proxy (Stdin Streaming)
 

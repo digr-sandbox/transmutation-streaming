@@ -1,0 +1,15 @@
+{
+  "must_preserve": [
+    "e699d4b7b187171c65b06694ed4f128a3c68e058",
+    "Author: ericdigr",
+    "feat(mcp): Finalize v24 Proxy Architecture and 35-case Evaluation Suite",
+    "049a2cb060fba8c50aebe9878f8201943bbaf1e0",
+    "docs: Update README and Roadmap for Zero-Trust Agentic Gateway"
+  ],
+  "can_prune": [
+    "49377277+ericdigr@users.noreply.github.com",
+    "Date:   Wed Apr 1 12:16:38 2026 -0500"
+  ],
+  "expected_bypass": true,
+  "minimum_compression_ratio": 0.0
+}

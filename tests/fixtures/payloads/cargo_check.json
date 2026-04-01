@@ -1,0 +1,15 @@
+{
+  "must_preserve": [
+    "transmutation",
+    "Finished `dev` profile",
+    "2m 21s"
+  ],
+  "can_prune": [
+    "Blocking waiting for file lock",
+    "Fresh unicode-ident",
+    "Running `C:\\Users\\axelr\\.rustup",
+    "--emit=dep-info,metadata"
+  ],
+  "expected_bypass": false,
+  "minimum_compression_ratio": 0.80
+}

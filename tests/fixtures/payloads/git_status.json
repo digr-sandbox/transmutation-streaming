@@ -1,0 +1,17 @@
+{
+  "must_preserve": [
+    "On branch main",
+    "modified:   examples/pruning_suite_test.rs",
+    "modified:   README.md",
+    "modified:   examples/heavy_pipe_test.rs",
+    "Untracked files:",
+    "GEMINI.md",
+    "audit_logs/"
+  ],
+  "can_prune": [
+    "(use \"git add <file>...\" to update what will be committed)",
+    "(use \"git restore <file>...\" to discard changes in working directory)"
+  ],
+  "expected_bypass": true,
+  "minimum_compression_ratio": 0.0
+}
