@@ -34,13 +34,20 @@ Transmutation exposes two distinct Model Context Protocol (MCP) tools to the age
 ### 🔌 Connecting the MCP Server
 To use the Transmutation Agentic Gateway in your AI tools, you must configure them to launch the `transmutation-mcp-proxy` binary using the `stdio` transport.
 
+If you are running the server from source across different projects, you **must** provide the absolute path to the Transmutation `Cargo.toml` file so the agent can launch it from anywhere.
+
 **For Claude Code (`claude.json`):**
 ```json
 {
   "mcpServers": {
     "transmutation": {
-      "command": "transmutation-mcp-proxy",
-      "args": ["--stdio"]
+      "command": "cargo",
+      "args": [
+        "run", 
+        "--manifest-path", "/absolute/path/to/transmutation-streaming/Cargo.toml", 
+        "--bin", "transmutation-mcp-proxy", 
+        "--", "--stdio"
+      ]
     }
   }
 }
@@ -52,7 +59,12 @@ To use the Transmutation Agentic Gateway in your AI tools, you must configure th
   "mcpServers": {
     "transmutation": {
       "command": "cargo",
-      "args": ["run", "--bin", "transmutation-mcp-proxy", "--", "--stdio"]
+      "args": [
+        "run", 
+        "--manifest-path", "/absolute/path/to/transmutation-streaming/Cargo.toml", 
+        "--bin", "transmutation-mcp-proxy", 
+        "--", "--stdio"
+      ]
     }
   }
 }
