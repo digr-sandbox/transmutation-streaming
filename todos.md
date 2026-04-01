@@ -23,5 +23,13 @@ Thanks to the "Single Reconstructed File" spooler in the CLI, the engine has acc
 
 1.  **Pass 1 (Global Analysis):** 
     Read the reconstructed file line-by-line via `BufReader` strictly to build the Global Frequency Dictionary (IDF), map vocabulary diversity (Entropy), and index protected spans (JSON/Code blocks). Memory stays flat because we only store mathematical metadata and byte offsets, not the text itself.
-2.  **Pass 2 (Execution & Pruning):** 
-    Read the file a second time. Armed with the global map, we dynamically apply the POS pruning and U-Shaped weighting line-by-line. Because Pass 1 gave us the total file size, the engine perfectly calculates the "Middle" of the document for U-Shaped weighting without needing a tail-buffer. The optimized output is written directly to the final Markdown buffer.
+3. Finalized Pruning Evaluation (CURRENT)
+- [IN PROGRESS] Finalize the **v24 Pruning Suite** breakdown (35 cases).
+- [IN PROGRESS] Achieve 99% accuracy across all technical categories (Build Logs, SQL, Git).
+- [TODO] Implement the **ROI Profitability Gate**: Only apply compression if net context savings exceed the provenance header overhead.
+- [TODO] Validate 50%+ compaction on repetitive server logs via **Lexicon Aliasing**.
+
+## 4. Feature Expansion & Tooling
+- [TODO] Analyze the feasibility of including specialized MCP tools to explicitly convert PDF, DOCX, PPTX, XLSX, and other document formats.
+- [TODO] Analyze the feasibility of exposing dedicated tools for **PDF-to-Image** rendering and **OCR** (Tesseract) within the Agentic Gateway.
+
