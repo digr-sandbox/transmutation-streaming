@@ -25,10 +25,7 @@ When an agent reads a massive source code file (`cat src/lib.rs`), Transmutation
 ## 2. TOON: Token-Oriented Object Notation
 For highly structured data (JSON, XML, HTML), statistical pruning destroys the syntax. Instead, Transmutation routes these formats through a custom **Native TOON Squeezer**.
 
-While inspired by the TOON format [4], Transmutation implements a robust, dependency-free array flattener directly in the engine to guarantee compatibility and performance. It achieves massive compression by:
-* **Flattening Hierarchies**: Deeply nested XML/HTML DOM trees and JSON objects are converted into flattened key-value dictionaries.
-* **Array Collapsing**: Instead of repeating keys for every object in a list, the native TOON engine collapses them into array syntax (e.g., `files[14]: a.txt b.txt c.txt`).
-* **Tag Stripping**: All structural bloat (quotes around keys, closing XML tags `</div>`, HTML noise like `<!DOCTYPE>`) is stripped, retaining only the relational data.
+📖 **For a deep dive into how Transmutation achieves 40-80% compression on structured formats via Array Collapsing and Tag Stripping, read the [TOON Architecture Guide](toon.md).**
 
 ## 3. The Code Map & Background Indexer
 To prevent the agent from blindly guessing file relationships via `grep`, Transmutation maintains a real-time, language-independent dependency graph of the workspace.
@@ -38,10 +35,13 @@ To prevent the agent from blindly guessing file relationships via `grep`, Transm
 2. **Universal Parsing**: When a file is modified, `tree-sitter` (using language-specific grammars for Rust, TypeScript, Python, etc.) parses the Abstract Syntax Tree (AST) to extract imports and exports.
 3. **SQLite Graph**: These relationships are saved as edges in the `audit.db` SQLite database.
 
-### The `read_code_map` Tool
-Agents are provided a specific MCP tool: `read_code_map`.
-* **Input**: `{"filename": "src/components/Button.tsx"}`
-* **Output**: A lightning-fast, zero-latency return of what files the target imports, and what files import the target.
+### The `read_code_map` Tool & Latent-K Injection
+Transmutation provides the `read_code_map` tool to query the SQLite graph instantly. However, the true power of this architecture is in its automatic integration with Latent-K.
+
+When the agent attempts to read a file (e.g., `cat src/converters/pdf.rs`), the engine performs **Unified Latent-K Extraction**:
+1. It queries the `read_code_map` database to determine what the file imports, and what files import the target.
+2. It prepends this `[ARCHITECTURE CODE MAP]` directly to the top of the Latent-K output.
+3. The LLM receives the full structural boundaries of the file (Dependencies + Signatures) *and* its global place in the workspace architecture in a single, token-crushed response.
 
 ## 4. The 3-Way Routing Architecture
 When Transmutation proxies a shell command, it dynamically routes the `stdout` to one of three engines:
