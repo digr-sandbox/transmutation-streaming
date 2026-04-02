@@ -2,13 +2,14 @@ use regex::Regex;
 use serde::Deserialize;
 use std::fs;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct RawRule {
     pub name: String,
     pub logic: String,
     pub message: String,
 }
 
+#[derive(Debug)]
 pub struct CompiledRule {
     pub name: String,
     pub logic: String,
@@ -16,6 +17,7 @@ pub struct CompiledRule {
     pub pattern_map: Vec<(String, Regex)>,
 }
 
+#[derive(Debug)]
 pub struct SecurityEngine {
     rules: Vec<CompiledRule>,
 }

@@ -26,6 +26,7 @@ impl TxtConverter {
     }
 
     /// Convert plain text to Markdown
+    #[allow(dead_code)]
     fn txt_to_markdown(&self, text: &str) -> String {
         let mut markdown = String::new();
         markdown.push_str("# Document\n\n");

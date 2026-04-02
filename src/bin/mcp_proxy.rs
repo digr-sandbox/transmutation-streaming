@@ -10,7 +10,7 @@ use std::process::Stdio;
 use std::time::Instant;
 use std::path::{Path, PathBuf};
 use transmutation::engines::security::SecurityEngine;
-use transmutation::{Converter, OutputFormat, ConversionOptions, Result as TransResult};
+use transmutation::{Converter, OutputFormat, Result as TransResult};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct AuditLogRecord {
@@ -29,11 +29,15 @@ struct AuditLogRecord {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // 1. Initialize Security Engine
-    let rules_path = std::env::var("RULES_JSON_PATH")
-        .unwrap_or_else(|_| "rules.json".to_string());
-
-    let security = SecurityEngine::load_from_file(Path::new(&rules_path))
-        .expect("Failed to load rules.json");
+    let security = match std::env::var("RULES_JSON_PATH") {
+        Ok(path) => SecurityEngine::load_from_file(Path::new(&path))
+            .expect("Failed to load rules.json from RULES_JSON_PATH"),
+        Err(_) => {
+            let default_rules = include_str!("../../rules.json");
+            SecurityEngine::load_from_str(default_rules)
+                .expect("Failed to parse default rules.json")
+        }
+    };
 
     let stdin = io::stdin();
     let mut stdout = io::stdout();
