@@ -34,37 +34,36 @@ Transmutation exposes two distinct Model Context Protocol (MCP) tools to the age
 ### 🔌 Connecting the MCP Server
 To use the Transmutation Agentic Gateway in your AI tools, you must configure them to launch the `transmutation-mcp-proxy` binary using the `stdio` transport.
 
-If you are running the server from source across different projects, you **must** provide the absolute path to the Transmutation `Cargo.toml` file so the agent can launch it from anywhere.
+**⚠️ CRITICAL**: Do not use `cargo run` in your MCP configuration. Cargo's startup delay will cause the MCP handshake to time out. You must pre-build the release binary and point your agent directly to the executable.
+
+1. **Pre-build the proxy:**
+```bash
+cargo build --release --features cli
+```
+
+2. **Update your Agent Configuration:**
+Replace `/absolute/path/to/` with the actual path to your transmutation repository.
 
 **For Claude Code (`claude.json`):**
 ```json
 {
   "mcpServers": {
     "transmutation": {
-      "command": "cargo",
-      "args": [
-        "run", 
-        "--manifest-path", "/absolute/path/to/transmutation-streaming/Cargo.toml", 
-        "--bin", "transmutation-mcp-proxy", 
-        "--", "--stdio"
-      ]
+      "command": "/absolute/path/to/transmutation-streaming/target/release/transmutation-mcp-proxy",
+      "args": ["--stdio"]
     }
   }
 }
 ```
 
 **For OpenClaw / Cursor (`mcp.json`):**
+*(Note: On Windows, append `.exe` to the command path)*
 ```json
 {
   "mcpServers": {
     "transmutation": {
-      "command": "cargo",
-      "args": [
-        "run", 
-        "--manifest-path", "/absolute/path/to/transmutation-streaming/Cargo.toml", 
-        "--bin", "transmutation-mcp-proxy", 
-        "--", "--stdio"
-      ]
+      "command": "/absolute/path/to/transmutation-streaming/target/release/transmutation-mcp-proxy",
+      "args": ["--stdio"]
     }
   }
 }
