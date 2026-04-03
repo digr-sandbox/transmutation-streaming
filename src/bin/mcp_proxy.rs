@@ -70,7 +70,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "id": id,
                     "result": {
                         "protocolVersion": "2024-11-05",
-                        "capabilities": { "tools": {} },
+                        "capabilities": {
+                            "tools": { "listChanged": false },
+                            "logging": {}
+                        },
                         "serverInfo": { "name": "transmutation-secure-proxy", "version": "0.5.0" }
                     }
                 })
@@ -123,7 +126,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     "required": ["filename"]
                                 }
                             }
-                        ]
+                        ],
+                        "nextCursor": null
                     }
                 })
             }
