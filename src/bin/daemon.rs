@@ -28,45 +28,60 @@ impl CodeMapEngine {
     fn new() -> Self {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute("CREATE TABLE edges (source TEXT, target TEXT, UNIQUE(source, target))", []).unwrap();
+        conn.execute("CREATE TABLE symbols (file TEXT, name TEXT, UNIQUE(file, name))", []).unwrap();
         Self { conn: std::sync::Mutex::new(conn) }
     }
 
-    fn extract_dependencies(content: &str, file_path: &str) -> HashSet<String> {
-        let mut targets = HashSet::new();
+    fn extract_data(content: &str, file_path: &str) -> (HashSet<String>, HashSet<String>) {
+        let mut edges = HashSet::new();
+        let mut symbols = HashSet::new();
+        
         let rust_import_re = Regex::new(r"use\s+crate::([a-zA-Z0-9_:]+)").unwrap();
         let rust_mod_re = Regex::new(r"pub\s+mod\s+([a-zA-Z0-9_]+)").unwrap();
+        let rust_symbol_re = Regex::new(r"pub\s+(struct|enum|trait|type|fn)\s+([a-zA-Z0-9_]+)").unwrap();
         
         for cap in rust_import_re.captures_iter(content) {
             let mut path = "src".to_string();
             for part in cap[1].split("::") {
                 if part == "*" || part.starts_with('{') { break; }
-                path.push('/');
-                path.push_str(part);
+                path.push('/'); path.push_str(part);
             }
-            targets.insert(format!("{}.rs", path));
-            targets.insert(format!("{}/mod.rs", path));
+            edges.insert(format!("{}.rs", path));
+            edges.insert(format!("{}/mod.rs", path));
         }
 
         for cap in rust_mod_re.captures_iter(content) {
             let parent = Path::new(file_path).parent().unwrap().to_string_lossy().replace("\\", "/");
-            targets.insert(format!("{}/{}.rs", parent, &cap[1]));
-            targets.insert(format!("{}/{}/mod.rs", parent, &cap[1]));
+            edges.insert(format!("{}/{}.rs", parent, &cap[1]));
+            edges.insert(format!("{}/{}/mod.rs", parent, &cap[1]));
         }
 
-        targets.into_iter().filter(|p| Path::new(p).exists()).collect()
+        for cap in rust_symbol_re.captures_iter(content) {
+            symbols.insert(cap[2].to_string());
+        }
+
+        (edges.into_iter().filter(|p| Path::new(p).exists()).collect(), symbols)
     }
 
     fn build_initial_map(&self) {
-        let conn = self.conn.lock().unwrap();
+        let mut all_data = Vec::new();
         for entry in WalkDir::new("src").into_iter().filter_map(|e| e.ok()) {
             if entry.path().extension().map_or(false, |ext| ext == "rs") {
                 let source = entry.path().to_string_lossy().replace("\\", "/");
                 if let Ok(content) = std::fs::read_to_string(entry.path()) {
-                    let targets = Self::extract_dependencies(&content, &source);
-                    for target in targets {
-                        let _ = conn.execute("INSERT OR IGNORE INTO edges (source, target) VALUES (?1, ?2)", rusqlite::params![source, target]);
-                    }
+                    let (edges, symbols) = Self::extract_data(&content, &source);
+                    all_data.push((source, edges, symbols));
                 }
+            }
+        }
+        
+        let conn = self.conn.lock().unwrap();
+        for (source, edges, symbols) in all_data {
+            for target in edges {
+                let _ = conn.execute("INSERT OR IGNORE INTO edges (source, target) VALUES (?1, ?2)", rusqlite::params![source, target]);
+            }
+            for sym in symbols {
+                let _ = conn.execute("INSERT OR IGNORE INTO symbols (file, name) VALUES (?1, ?2)", rusqlite::params![source, sym]);
             }
         }
     }
@@ -117,19 +132,44 @@ impl CodeMapEngine {
     }
 
     fn query_impact(&self, symbol: &str) -> String {
-        // Simple regex-based impact analysis for the demo
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT DISTINCT source FROM edges WHERE target LIKE ?1").unwrap();
-        let pattern = format!("%{}%", symbol);
-        let rows = stmt.query_map([pattern], |row| row.get::<_, String>(0)).unwrap();
         
-        let mut out = format!("[BLAST RADIUS: {}]\nFiles affected:\n", symbol);
-        let mut found = false;
-        for path in rows.flatten() {
-            out.push_str(&format!("  - {}\n", path));
-            found = true;
+        // 1. Find who defines the symbol
+        let mut stmt_def = conn.prepare("SELECT file FROM symbols WHERE name = ?1").unwrap();
+        let def_files: Vec<String> = stmt_def.query_map([symbol], |row| row.get(0)).unwrap().flatten().collect();
+        
+        let mut affected = HashSet::new();
+        
+        // 2. Find who imports those files
+        for f in &def_files {
+            let mut stmt_imp = conn.prepare("SELECT source FROM edges WHERE target = ?1").unwrap();
+            let rows = stmt_imp.query_map([f], |row| row.get::<_, String>(0)).unwrap();
+            for r in rows.flatten() { affected.insert(r); }
         }
-        if !found { out.push_str("  (No direct internal dependencies found)\n"); }
+
+        // 3. Fallback: Search all files for mentions of the symbol (excluding definitions)
+        for entry in WalkDir::new("src").into_iter().filter_map(|e| e.ok()) {
+            if entry.path().extension().map_or(false, |ext| ext == "rs") {
+                let path = entry.path().to_string_lossy().replace("\\", "/");
+                if def_files.contains(&path) { continue; }
+                if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                    if content.contains(symbol) {
+                        affected.insert(path);
+                    }
+                }
+            }
+        }
+        
+        let mut out = format!("[BLAST RADIUS: {}]\nDefined in: {}\nFiles affected:\n", 
+            symbol, if def_files.is_empty() { "(Unknown)".to_string() } else { def_files.join(", ") });
+        
+        if affected.is_empty() {
+            out.push_str("  (No usage found)\n");
+        } else {
+            for path in affected {
+                out.push_str(&format!("  - {}\n", path));
+            }
+        }
         out
     }
 }

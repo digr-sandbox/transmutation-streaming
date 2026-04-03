@@ -41,8 +41,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut stdout = io::stdout();
     let mut reader = BufReader::new(stdin).lines();
 
-    eprintln!("MCP Proxy ready. Waiting for JSON-RPC on stdin...");
-
     // 3. The MCP Event Loop
     while let Ok(Some(line)) = reader.next_line().await {
         tracing::info!("Received: {}", line);
@@ -167,7 +165,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         let mut out = serde_json::to_string(&response)?;
-        tracing::debug!("Sending: {}", out);
+        tracing::info!("Sending: {}", out);
         out.push('\n');
         stdout.write_all(out.as_bytes()).await?;
         stdout.flush().await?;
