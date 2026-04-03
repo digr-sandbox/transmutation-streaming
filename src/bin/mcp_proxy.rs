@@ -71,14 +71,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "result": {
                         "protocolVersion": "2024-11-05",
                         "capabilities": {
-                            "tools": { "listChanged": false },
-                            "logging": {}
+                            "tools": {},
+                            "prompts": {},
+                            "resources": {}
                         },
                         "serverInfo": { "name": "transmutation-secure-proxy", "version": "0.5.0" }
                     }
                 })
             }
             "ping" => json!({ "jsonrpc": "2.0", "id": id, "result": {} }),
+            "prompts/list" => json!({ "jsonrpc": "2.0", "id": id, "result": { "prompts": [] } }),
+            "resources/list" => json!({ "jsonrpc": "2.0", "id": id, "result": { "resources": [] } }),
             "tools/list" => {
                 json!({
                     "jsonrpc": "2.0",
@@ -127,7 +130,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 }
                             }
                         ],
-                        "nextCursor": null
+                        "nextCursor": "none"
                     }
                 })
             }
@@ -215,8 +218,8 @@ async fn ensure_daemon_running(client: &Client) -> Result<(), Box<dyn std::error
     tracing::warn!("Daemon not responding. Attempting cleanup and restart...");
 
     // 2. Kill any hung instances
-    let mut sys = System::new_all();
-    sys.refresh_all();
+    let mut sys = System::new();
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
     for process in sys.processes_by_exact_name(std::ffi::OsStr::new(DAEMON_BIN)) {
         tracing::warn!("Killing hung daemon process: {}", process.pid());
         process.kill();

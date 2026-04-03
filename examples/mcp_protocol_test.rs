@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 1. Spawn the MCP proxy binary
     let mut child = Command::new("cargo")
-        .args(["run", "--quiet", "--features", "cli", "--bin", "transmutation-mcp-proxy"])
+        .args(["run", "--release", "--quiet", "--features", "cli", "--bin", "transmutation-mcp-proxy"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     reader.read_line(&mut line)?;
     println!("   Response: {}", line.trim());
     assert!(line.contains("transmutation-secure-proxy"));
-    assert!(line.contains("0.4.0"));
+    assert!(line.contains("0.5.0"));
 
     // TEST 2: Tool Listing
     println!("\n▶️  [TOOLS] Sending tools/list...");

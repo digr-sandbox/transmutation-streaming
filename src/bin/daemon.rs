@@ -370,7 +370,20 @@ fn get_provenance_from_db(req_id: &str) -> Result<String, Box<dyn std::error::Er
     let db_path = db_dir.join("audit.db");
     let conn = rusqlite::Connection::open(&db_path)?;
     let mut stmt = conn.prepare("SELECT e.*, c.raw_input, c.final_output FROM audit_events e JOIN audit_content c ON e.request_id = c.request_id WHERE e.request_id = ?")?;
-    let mut rows = stmt.query_map([req_id], |row| Ok(serde_json::json!({ "request_id": row.get::<_, String>(1)?, "command": row.get::<_, String>(2)?, "exit_code": row.get::<_, i32>(3)?, "security_ms": row.get::<_, i64>(4)?, "shell_ms": row.get::<_, i64>(5)?, "proxy_ms": row.get::<_, i64>(6)?, "total_ms": row.get::<_, i64>(7)?, "input_bytes": row.get::<_, i64>(8)?, "output_bytes": row.get::<_, i64>(9)?, "raw_input_preview": row.get::<_, String>(10)?.chars().take(500).collect::<String>(), "final_output_preview": row.get::<_, String>(11)?.chars().take(500).collect::<String>(), })))?;
+    let mut rows = stmt.query_map([req_id], |row| Ok(serde_json::json!({ 
+        "request_id": row.get::<_, String>(0)?, 
+        "timestamp": row.get::<_, String>(1)?, 
+        "command": row.get::<_, String>(2)?, 
+        "exit_code": row.get::<_, i32>(3)?, 
+        "security_ms": row.get::<_, i64>(4)?, 
+        "shell_ms": row.get::<_, i64>(5)?, 
+        "proxy_ms": row.get::<_, i64>(6)?, 
+        "total_ms": row.get::<_, i64>(7)?, 
+        "input_bytes": row.get::<_, i64>(8)?, 
+        "output_bytes": row.get::<_, i64>(9)?, 
+        "raw_input_preview": row.get::<_, String>(10)?.chars().take(500).collect::<String>(), 
+        "final_output_preview": row.get::<_, String>(11)?.chars().take(500).collect::<String>(), 
+    })))?;
     if let Some(row) = rows.next() { Ok(serde_json::to_string_pretty(&row?)?) } else { Err("Request ID not found".into()) }
 }
 
