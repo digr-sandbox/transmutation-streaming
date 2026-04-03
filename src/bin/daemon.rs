@@ -297,22 +297,85 @@ async fn handle_discovery(State(state): State<Arc<AppState>>, Json(payload): Jso
 
 fn structural_extraction(original_input: &str) -> String {
     let mut lines = Vec::new();
-    let mut in_block = false;
-    let mut brace_depth = 0;
+    let mut in_import = false;
+
+    let boredom_table: HashSet<&str> = [
+        "if", "else", "let", "var", "const", "return", "public", "private", "protected", 
+        "class", "function", "fn", "void", "int", "char", "string", "bool", "true", "false", 
+        "import", "from", "use", "include", "struct", "impl", "type", "interface", "package", 
+        "namespace", "static", "async", "await", "try", "catch", "throw", "new", "delete", 
+        "this", "self", "super", "for", "while", "do", "switch", "case", "default", "break", 
+        "continue", "in", "of", "as", "is"
+    ].iter().cloned().collect();
+
     for line in original_input.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("pub struct ") || trimmed.starts_with("pub fn ") || trimmed.starts_with("impl ") {
-            if trimmed.ends_with("{") { in_block = true; brace_depth = 1; lines.push(format!("{} ... }}", line.trim_end_matches('{').trim_end())); }
-            else { lines.push(line.to_string()); }
+        if trimmed.is_empty() { continue; }
+        
+        // --- PASS 0: NOISE EVICTION ---
+        if trimmed.contains("JUNK_") || trimmed.contains("LICENSE_HEADER") || trimmed.contains("boilerplate") {
             continue;
         }
-        if in_block {
-            if trimmed.contains("{") { brace_depth += 1; }
-            if trimmed.contains("}") { brace_depth -= 1; }
-            if brace_depth == 0 { in_block = false; }
+
+        // --- PASS 1: IMPORT ANCHORING ---
+        if trimmed.starts_with("import ") || trimmed.starts_with("use ") || trimmed.starts_with("#include") || trimmed.starts_with("package ") {
+            if trimmed.contains('{') && !trimmed.contains('}') { in_import = true; }
+            lines.push(line.to_string());
+            if trimmed.contains('}') || trimmed.contains(';') { in_import = false; }
             continue;
         }
-        if trimmed.starts_with("use ") || trimmed.starts_with("pub mod ") { lines.push(line.to_string()); }
+        if in_import {
+            lines.push(line.to_string());
+            if trimmed.contains('}') || trimmed.contains(';') { in_import = false; }
+            continue;
+        }
+
+        // --- PASS 2: WEIGHTED SIGNAL SCORING ---
+        let mut score = 0;
+
+        // Meta-Gravity
+        if trimmed.starts_with('@') || trimmed.starts_with("#[") || trimmed.starts_with("#!") {
+            score += 10;
+        }
+        
+        // Structural Gravity
+        if trimmed.ends_with('{') || trimmed.ends_with(':') || trimmed.ends_with('[') || 
+           trimmed.contains("interface ") || (trimmed.contains("func ") && !trimmed.contains('}')) {
+            score += 10;
+        }
+
+        // Flow Control
+        if trimmed.contains("await") || trimmed.contains("return") || trimmed.contains("throw") || trimmed.contains("yield") {
+            score += 5;
+        }
+
+        // Relational Gravity (Chains and Keys)
+        if trimmed.contains('.') || trimmed.contains(':') || (trimmed.contains('(') && trimmed.contains(')')) {
+            score += 5;
+        }
+
+        // Information Density (Boredom Check)
+        let has_high_signal = trimmed.split(|c: char| !c.is_alphanumeric() && c != '@' && c != '_')
+            .any(|token| {
+                if token.is_empty() { return false; }
+                if boredom_table.contains(token.to_lowercase().as_str()) { return false; }
+                
+                // Mix of cases (CamelCase or PascalCase) is high signal
+                let has_upper = token.chars().any(|c| c.is_uppercase());
+                let has_lower = token.chars().any(|c| c.is_lowercase());
+                let is_mixed = has_upper && has_lower;
+                
+                token.len() > 3 && (is_mixed || token.contains('_') || token.contains('@'))
+            });
+        
+        if has_high_signal {
+            score += 5;
+        }
+
+        // Final Threshold
+        if score > 0 {
+            lines.push(line.to_string());
+        }
     }
     lines.join("\n")
 }

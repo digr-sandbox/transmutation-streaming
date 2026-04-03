@@ -1,0 +1,80 @@
+{
+  "tests": [
+    {
+      "file": "permissions.service.ts",
+      "category": "TypeScript/NestJS",
+      "required_entities": {
+        "decorators": ["@Injectable", "@InjectRepository"],
+        "classes": ["PermissionsService"],
+        "methods": ["getCurrentUserPermissions"],
+        "types": ["Promise<string[]>"],
+        "imports": ["@nestjs/common", "typeorm"]
+      }
+    },
+    {
+      "file": "auth.controller.ts",
+      "category": "TypeScript/NestJS",
+      "required_entities": {
+        "decorators": ["@Controller", "@Post", "@UseGuards"],
+        "classes": ["AuthController"],
+        "methods": ["login", "register"],
+        "imports": ["@nestjs/common", "@nestjs/passport"]
+      }
+    },
+    {
+      "file": "all-exceptions.filter.ts",
+      "category": "TypeScript/NestJS",
+      "required_entities": {
+        "decorators": ["@Catch"],
+        "classes": ["AllExceptionsFilter"],
+        "methods": ["catch"],
+        "imports": ["ArgumentsHost", "HttpServer"]
+      }
+    },
+    {
+      "file": "user.entity.ts",
+      "category": "TypeScript/NestJS",
+      "required_entities": {
+        "decorators": ["@Entity", "@PrimaryGeneratedColumn", "@Column"],
+        "classes": ["User"],
+        "fields": ["username", "email", "password"]
+      }
+    },
+    {
+      "file": "converter.go",
+      "category": "Go",
+      "required_entities": {
+        "interfaces": ["DocumentConverter"],
+        "structs": ["PdfConverter", "ConversionResult"],
+        "methods": ["Convert"],
+        "imports": ["context", "fmt"]
+      }
+    },
+    {
+      "file": "converter.c",
+      "category": "C",
+      "required_entities": {
+        "structs": ["ConversionResult", "ConverterConfig"],
+        "functions": ["convert_document", "free_result"],
+        "includes": ["stdio.h", "stdlib.h"]
+      }
+    },
+    {
+      "file": "logging_utils.py",
+      "category": "Python",
+      "required_entities": {
+        "functions": ["setup_logging", "get_logger"],
+        "classes": ["CustomFormatter"],
+        "imports": ["logging", "json"]
+      }
+    },
+    {
+      "file": "db_schema_validator.py",
+      "category": "Python",
+      "required_entities": {
+        "functions": ["validate_schema", "check_indexes"],
+        "imports": ["sqlite3", "argparse"]
+      }
+    }
+  ]
+}
