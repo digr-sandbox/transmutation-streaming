@@ -142,6 +142,14 @@ clap = { version = "4.5", features = ["derive", "cargo", "env"], optional = true
 indicatif = { version = "0.17", optional = true }
 console = { version = "0.15", optional = true }
 colored = { version = "2.2", optional = true }
+axum = "0.8.8"
+reqwest = { version = "0.13.2", features = ["json"] }
+tracing-appender = "0.2.4"
+notify = "8.2.0"
+tree-sitter = "0.26.8"
+tree-sitter-rust = "0.24.2"
+tree-sitter-typescript = "0.23.2"
+tree-sitter-python = "0.25.0"
 
 # Note: External integrations removed (cache, HTTP, metrics)
 # Transmutation is a library/CLI - external features are handled by HiveLLM Vectorizer

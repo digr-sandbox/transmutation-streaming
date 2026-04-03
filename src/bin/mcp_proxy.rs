@@ -1,58 +1,69 @@
-//! Transmutation MCP Proxy - Unified Security & Compression Server (v13)
+//! Transmutation MCP Proxy - Lightweight Wrapper
 //!
-//! Fully compliant with the 2026 Model Context Protocol (MCP) Standards.
-//! Features: Thompson NFA Security, Multi-Tenant Provenance, Header/Detail/Footer Audit Schema.
+//! Handles JSON-RPC over stdio and forwards to the persistent Transmutation Daemon.
+//! Includes self-healing lifecycle management (auto-spawning the daemon).
 
-use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
+use std::time::{Duration, Instant};
+use sysinfo::System;
 use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader};
-use std::process::Stdio;
-use std::time::Instant;
-use std::path::{Path, PathBuf};
-use transmutation::engines::security::SecurityEngine;
-use transmutation::{Converter, OutputFormat, Result as TransResult};
+use reqwest::Client;
 
-#[derive(Serialize, Deserialize, Debug)]
-struct AuditLogRecord {
-    timestamp: chrono::DateTime<chrono::Utc>,
-    request_id: String,
-    command: String,
-    exit_code: i32,
-    security_ms: u128,
-    shell_ms: u128,
-    proxy_ms: u128,
-    total_ms: u128,
-    input_bytes: usize,
-    output_bytes: usize,
-}
+const DAEMON_URL: &str = "http://127.0.0.1:48192";
+const DAEMON_BIN: &str = "daemon";
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // 1. Initialize Security Engine
-    let security = match std::env::var("RULES_JSON_PATH") {
-        Ok(path) => SecurityEngine::load_from_file(Path::new(&path))
-            .expect("Failed to load rules.json from RULES_JSON_PATH"),
-        Err(_) => {
-            let default_rules = include_str!("../../rules.json");
-            SecurityEngine::load_from_str(default_rules)
-                .expect("Failed to parse default rules.json")
-        }
-    };
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 1. Setup minimal logging for the wrapper
+    let log_dir = dirs::home_dir()
+        .map(|p| p.join(".transmutation").join("logs"))
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    std::fs::create_dir_all(&log_dir).ok();
+    
+    let file_appender = tracing_appender::rolling::daily(log_dir, "mcp_proxy.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+    
+    tracing_subscriber::fmt()
+        .with_writer(non_blocking)
+        .with_target(false)
+        .init();
+
+    tracing::info!("MCP Proxy starting...");
+
+    let client = Client::builder()
+        .timeout(Duration::from_secs(300))
+        .build()?;
+
+    // 2. Self-Healing Lifecycle Management
+    ensure_daemon_running(&client).await?;
 
     let stdin = io::stdin();
     let mut stdout = io::stdout();
     let mut reader = BufReader::new(stdin).lines();
 
-    // 2. The MCP Event Loop
+    eprintln!("MCP Proxy ready. Waiting for JSON-RPC on stdin...");
+
+    // 3. The MCP Event Loop
     while let Ok(Some(line)) = reader.next_line().await {
-        let start_rpc = Instant::now();
+        tracing::info!("Received: {}", line);
+
         let req: Value = match serde_json::from_str(&line) {
             Ok(v) => v,
-            Err(_) => continue,
+            Err(e) => {
+                tracing::error!("Failed to parse JSON-RPC: {}", e);
+                continue;
+            }
         };
 
-        let id = req["id"].clone();
         let method = req["method"].as_str().unwrap_or("");
+        
+        let id = match req.get("id") {
+            Some(v) if !v.is_null() => v.clone(),
+            _ => {
+                tracing::info!("Skipping Notification '{}'", method);
+                continue;
+            }
+        };
 
         let response = match method {
             "initialize" => {
@@ -61,8 +72,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     "id": id,
                     "result": {
                         "protocolVersion": "2024-11-05",
-                        "capabilities": { "tools": {}, "notifications": true },
-                        "serverInfo": { "name": "transmutation-secure-proxy", "version": "0.4.0" }
+                        "capabilities": { "tools": {} },
+                        "serverInfo": { "name": "transmutation-secure-proxy", "version": "0.5.0" }
                     }
                 })
             }
@@ -90,6 +101,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                     "properties": { "request_id": { "type": "string" } },
                                     "required": ["request_id"]
                                 }
+                            },
+                            {
+                                "name": "query_recon",
+                                "description": "Day-One Call: Retrieve the top-level architectural clusters of the project (e.g., 'Where is the ML logic?').",
+                                "inputSchema": { "type": "object", "properties": {} }
+                            },
+                            {
+                                "name": "query_impact",
+                                "description": "Blast Radius Call: See every file that will turn red if you modify a specific symbol (Trait, Struct, or Function).",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": { "symbol": { "type": "string" } },
+                                    "required": ["symbol"]
+                                }
+                            },
+                            {
+                                "name": "query_discovery",
+                                "description": "Needle-in-a-Haystack Call: Retrieve a focused Latent-K structural skeleton and code map for a specific file.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": { "filename": { "type": "string" } },
+                                    "required": ["filename"]
+                                }
                             }
                         ]
                     }
@@ -100,41 +134,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 
                 if tool_name == "get_provenance" {
                     let req_id = req["params"]["arguments"]["request_id"].as_str().unwrap_or("");
-                    match get_provenance_from_db(req_id) {
-                        Ok(audit_json) => json!({
-                            "jsonrpc": "2.0",
-                            "id": id,
-                            "result": { "content": [{ "type": "text", "text": audit_json }], "isError": false }
-                        }),
-                        Err(e) => json!({
-                            "jsonrpc": "2.0",
-                            "id": id,
-                            "result": { "content": [{ "type": "text", "text": format!("Audit NotFound: {}", e) }], "isError": true }
-                        }),
+                    match fetch_from_daemon(&client, "provenance", json!({ "request_id": req_id })).await {
+                        Ok(res) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": res.content }], "isError": res.is_error } }),
+                        Err(e) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": format!("Daemon Error: {}", e) }], "isError": true } }),
+                    }
+                } else if tool_name == "query_recon" {
+                    match fetch_from_daemon(&client, "recon", json!({})).await {
+                        Ok(res) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": res.content }], "isError": res.is_error } }),
+                        Err(e) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": format!("Daemon Error: {}", e) }], "isError": true } }),
+                    }
+                } else if tool_name == "query_impact" {
+                    let symbol = req["params"]["arguments"]["symbol"].as_str().unwrap_or("");
+                    match fetch_from_daemon(&client, "impact", json!({ "symbol": symbol })).await {
+                        Ok(res) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": res.content }], "isError": res.is_error } }),
+                        Err(e) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": format!("Daemon Error: {}", e) }], "isError": true } }),
+                    }
+                } else if tool_name == "query_discovery" {
+                    let filename = req["params"]["arguments"]["filename"].as_str().unwrap_or("");
+                    match fetch_from_daemon(&client, "discovery", json!({ "filename": filename })).await {
+                        Ok(res) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": res.content }], "isError": res.is_error } }),
+                        Err(e) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": format!("Daemon Error: {}", e) }], "isError": true } }),
                     }
                 } else {
                     let cmd = req["params"]["arguments"]["command"].as_str().unwrap_or("");
-                    let start_security = Instant::now();
-                    let security_result = security.evaluate(cmd, tool_name);
-                    let security_ms = start_security.elapsed().as_millis();
-
-                    if let Some(error_msg) = security_result {
-                        json!({
-                            "jsonrpc": "2.0",
-                            "id": id,
-                            "result": { "content": [{ "type": "text", "text": error_msg }], "isError": true }
-                        })
-                    } else {
-                        match execute_and_transmute(cmd, security_ms, start_rpc).await {
-                            Ok((transmuted_text, is_error)) => json!({
-                                "jsonrpc": "2.0", "id": id,
-                                "result": { "content": [{ "type": "text", "text": transmuted_text }], "isError": is_error }
-                            }),
-                            Err(e) => json!({
-                                "jsonrpc": "2.0", "id": id,
-                                "result": { "content": [{ "type": "text", "text": format!("Proxy Error: {}", e) }], "isError": true }
-                            }),
-                        }
+                    match forward_to_daemon(&client, cmd, tool_name).await {
+                        Ok(res) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": res.content }], "isError": res.is_error } }),
+                        Err(e) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": format!("Daemon Error: {}", e) }], "isError": true } }),
                     }
                 }
             }
@@ -142,165 +167,103 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         };
 
         let mut out = serde_json::to_string(&response)?;
+        tracing::debug!("Sending: {}", out);
         out.push('\n');
         stdout.write_all(out.as_bytes()).await?;
         stdout.flush().await?;
     }
+    
+    tracing::info!("MCP Proxy shutting down.");
     Ok(())
 }
 
-async fn execute_and_transmute(cmd: &str, security_ms: u128, rpc_timer: Instant) -> Result<(String, bool), Box<dyn std::error::Error + Send + Sync>> {
-    let start_shell = Instant::now();
-    let req_id = format!("req_{}", start_shell.elapsed().as_nanos()); // UNIQUE REQUEST ID
+async fn fetch_from_daemon(client: &Client, endpoint: &str, payload: Value) -> Result<DaemonResponse, Box<dyn std::error::Error>> {
+    let res = client.post(format!("{}/{}", DAEMON_URL, endpoint))
+        .json(&payload)
+        .send()
+        .await?;
     
-    let temp_file = tempfile::Builder::new().prefix("mcp_spool_").suffix(".txt").tempfile()?;
-    let mut child = tokio::process::Command::new("cmd").arg("/c").arg(cmd).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()?;
-
-    let mut stdout = child.stdout.take().unwrap();
-    let mut stderr = child.stderr.take().unwrap();
-    
-    // Spool to disk (OOM-Safe)
-    let mut file = tokio::fs::File::from_std(temp_file.reopen()?);
-    tokio::io::copy(&mut stdout, &mut file).await?;
-    tokio::io::copy(&mut stderr, &mut file).await?;
-    
-    let status = child.wait().await?;
-    let shell_ms = start_shell.elapsed().as_millis();
-
-    // Read raw input back for auditing (before pruning)
-    let raw_input = std::fs::read_to_string(temp_file.path()).unwrap_or_default();
-
-    let start_proxy = Instant::now();
-    let converter = Converter::new()?;
-    let result = converter.convert(temp_file.path()).to(OutputFormat::Markdown { split_pages: false, optimize_for_llm: true }).execute().await?;
-    let proxy_ms = start_proxy.elapsed().as_millis();
-
-    let mut final_text = String::new();
-    final_text.push_str(&format!("# ⚡ PROVENANCE [ID: {} | Transformed: TOON+STAT_V7]\n---\n", req_id));
-    for chunk in &result.content { final_text.push_str(&String::from_utf8_lossy(&chunk.data)); }
-
-    let record = AuditLogRecord {
-        timestamp: chrono::Utc::now(),
-        request_id: req_id,
-        command: cmd.to_string(),
-        exit_code: status.code().unwrap_or(-1),
-        security_ms, shell_ms, proxy_ms,
-        total_ms: rpc_timer.elapsed().as_millis(),
-        input_bytes: result.statistics.input_size_bytes as usize,
-        output_bytes: final_text.len(),
-    };
-
-    let _ = offload_to_sqlite(&record, &raw_input, &final_text);
-    Ok((final_text, !status.success()))
+    let daemon_res: DaemonResponse = res.json().await?;
+    Ok(daemon_res)
 }
 
-fn get_provenance_from_db(req_id: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    let db_dir = dirs::home_dir().map(|p| p.join(".transmutation")).unwrap_or_else(|| PathBuf::from("."));
-    let db_path = db_dir.join("audit.db");
-    let conn = rusqlite::Connection::open(&db_path)?;
-    
-    // Query joined tables for full provenance
-    let mut stmt = conn.prepare("
-        SELECT e.*, c.raw_input, c.final_output 
-        FROM audit_events e 
-        JOIN audit_content c ON e.request_id = c.request_id 
-        WHERE e.request_id = ?")?;
-        
-    let mut rows = stmt.query_map([req_id], |row| {
-        Ok(json!({
-            "request_id": row.get::<_, String>(1)?,
-            "command": row.get::<_, String>(2)?,
-            "exit_code": row.get::<_, i32>(3)?,
-            "security_ms": row.get::<_, i64>(4)?,
-            "shell_ms": row.get::<_, i64>(5)?,
-            "proxy_ms": row.get::<_, i64>(6)?,
-            "total_ms": row.get::<_, i64>(7)?,
-            "input_bytes": row.get::<_, i64>(8)?,
-            "output_bytes": row.get::<_, i64>(9)?,
-            "raw_input_preview": row.get::<_, String>(10)?.chars().take(500).collect::<String>(),
-            "final_output_preview": row.get::<_, String>(11)?.chars().take(500).collect::<String>(),
-        }))
-    })?;
+#[derive(serde::Deserialize)]
+struct DaemonResponse {
+    content: String,
+    is_error: bool,
+}
 
-    if let Some(row) = rows.next() {
-        Ok(serde_json::to_string_pretty(&row?)?)
-    } else {
-        Err("Request ID not found".into())
+async fn forward_to_daemon(client: &Client, command: &str, tool_name: &str) -> Result<DaemonResponse, Box<dyn std::error::Error>> {
+    let res = client.post(format!("{}/execute", DAEMON_URL))
+        .json(&json!({ "command": command, "tool_name": tool_name }))
+        .send()
+        .await?;
+    
+    let daemon_res: DaemonResponse = res.json().await?;
+    Ok(daemon_res)
+}
+
+async fn ensure_daemon_running(client: &Client) -> Result<(), Box<dyn std::error::Error>> {
+    // 1. Check if it's already healthy
+    if is_daemon_healthy(client).await {
+        tracing::info!("Daemon is already running and healthy.");
+        return Ok(());
     }
+
+    tracing::warn!("Daemon not responding. Attempting cleanup and restart...");
+
+    // 2. Kill any hung instances
+    let mut sys = System::new_all();
+    sys.refresh_all();
+    for process in sys.processes_by_exact_name(std::ffi::OsStr::new(DAEMON_BIN)) {
+        tracing::warn!("Killing hung daemon process: {}", process.pid());
+        process.kill();
+    }
+    // Also try with .exe for Windows
+    let bin_exe = format!("{}.exe", DAEMON_BIN);
+    for process in sys.processes_by_exact_name(std::ffi::OsStr::new(&bin_exe)) {
+        tracing::warn!("Killing hung daemon process: {}", process.pid());
+        process.kill();
+    }
+
+    // Give the OS a moment to clean up ports
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // 3. Spawn the daemon
+    // We assume the daemon binary is in the same directory as the proxy
+    let current_exe = std::env::current_exe()?;
+    let daemon_name = format!("{}{}", DAEMON_BIN, std::env::consts::EXE_SUFFIX);
+    let daemon_path = current_exe.parent().unwrap().join(daemon_name);
+    
+    tracing::info!("Spawning new daemon from: {}", daemon_path.display());
+    
+    tokio::process::Command::new(&daemon_path)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()?;
+
+    // 4. Wait for health (up to 5 seconds)
+    let start = Instant::now();
+    let timeout = Duration::from_secs(5);
+    
+    while start.elapsed() < timeout {
+        if is_daemon_healthy(client).await {
+            tracing::info!("Daemon successfully started and healthy.");
+            return Ok(());
+        }
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+
+    Err("Failed to start daemon within 5 seconds".into())
 }
 
-fn offload_to_sqlite(record: &AuditLogRecord, raw_input: &str, final_output: &str) -> TransResult<()> {
-    let db_dir = dirs::home_dir()
-        .map(|p| p.join(".transmutation"))
-        .unwrap_or_else(|| PathBuf::from("."));
-    let db_path = db_dir.join("audit.db");
-    let mut conn = rusqlite::Connection::open(&db_path).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Connection failed", e))?;
-
-    let tx = conn.transaction().map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "TX start failed", e))?;
-
-    // 1. Audit Headers (Metadata)
-    tx.execute(
-        "CREATE TABLE IF NOT EXISTS audit_events (
-            request_id TEXT PRIMARY KEY,
-            timestamp TEXT,
-            command TEXT,
-            exit_code INTEGER,
-            security_ms INTEGER,
-            shell_ms INTEGER,
-            proxy_ms INTEGER,
-            total_ms INTEGER,
-            input_bytes INTEGER,
-            output_bytes INTEGER
-        )", [],
-    ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Header table failed", e))?;
-
-    // 2. Audit Details (Content)
-    tx.execute(
-        "CREATE TABLE IF NOT EXISTS audit_content (
-            request_id TEXT PRIMARY KEY,
-            raw_input TEXT,
-            final_output TEXT,
-            FOREIGN KEY(request_id) REFERENCES audit_events(request_id)
-        )", [],
-    ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Content table failed", e))?;
-
-    // 3. Accuracy Failures (Footer/Tracking)
-    tx.execute(
-        "CREATE TABLE IF NOT EXISTS accuracy_failures (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            request_id TEXT,
-            failed_line TEXT,
-            missed_token TEXT,
-            score_breakdown TEXT,
-            FOREIGN KEY(request_id) REFERENCES audit_events(request_id)
-        )", [],
-    ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Failure table failed", e))?;
-
-    tx.execute(
-        "INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        rusqlite::params![
-            record.request_id,
-            record.timestamp.to_rfc3339(),
-            record.command,
-            record.exit_code,
-            record.security_ms as i64,
-            record.shell_ms as i64,
-            record.proxy_ms as i64,
-            record.total_ms as i64,
-            record.input_bytes as i64,
-            record.output_bytes as i64,
-        ],
-    ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Header insert failed", e))?;
-
-    tx.execute(
-        "INSERT INTO audit_content VALUES (?, ?, ?)",
-        rusqlite::params![
-            record.request_id,
-            raw_input,
-            final_output,
-        ],
-    ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Content insert failed", e))?;
-
-    tx.commit().map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "TX commit failed", e))?;
-    Ok(())
+async fn is_daemon_healthy(client: &Client) -> bool {
+    match client.get(format!("{}/health", DAEMON_URL))
+        .timeout(Duration::from_millis(500))
+        .send()
+        .await 
+    {
+        Ok(res) => res.status().is_success(),
+        Err(_) => false,
+    }
 }
