@@ -1,0 +1,54 @@
+name: Build FFI Libraries (Cross-Platform)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-linux-ffi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential pkg-config libssl-dev zlib1g-dev libtesseract-dev libleptonica-dev
+
+      - name: Build FFI Library
+        run: |
+          chmod +x scripts/build_cpp.sh
+          ./scripts/build_cpp.sh
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffi-libs-linux
+          path: libs/libdocling-ffi-linux_x86.so
+
+  build-macos-ffi:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Install Dependencies
+        run: |
+          brew install cmake tesseract poppler ffmpeg
+
+      - name: Build FFI Library
+        run: |
+          chmod +x scripts/build_cpp.sh
+          ./scripts/build_cpp.sh
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffi-libs-macos
+          path: libs/libdocling-ffi-macos_ARM.dylib
