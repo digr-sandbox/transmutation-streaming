@@ -298,6 +298,7 @@ async fn handle_discovery(State(state): State<Arc<AppState>>, Json(payload): Jso
 fn structural_extraction(original_input: &str) -> String {
     let mut lines = Vec::new();
     let mut in_import = false;
+    let mut depth = 0;
 
     let boredom_table: HashSet<&str> = [
         "if", "else", "let", "var", "const", "return", "public", "private", "protected", 
@@ -312,7 +313,11 @@ fn structural_extraction(original_input: &str) -> String {
         let trimmed = line.trim();
         if trimmed.is_empty() { continue; }
         
-        // --- PASS 0: NOISE EVICTION ---
+        // --- PASS 0: COMMENT & NOISE EVICTION ---
+        if (trimmed.starts_with("//") || trimmed.starts_with('#') || trimmed.starts_with("/*") || trimmed.starts_with('*')) 
+           && !trimmed.contains('@') && !trimmed.contains("#[") {
+            continue;
+        }
         if trimmed.contains("JUNK_") || trimmed.contains("LICENSE_HEADER") || trimmed.contains("boilerplate") {
             continue;
         }
@@ -330,52 +335,77 @@ fn structural_extraction(original_input: &str) -> String {
             continue;
         }
 
-        // --- PASS 2: WEIGHTED SIGNAL SCORING ---
+        // --- PASS 2: DEPTH TRACKING ---
+        let open_braces = trimmed.chars().filter(|&c| c == '{').count();
+        let close_braces = trimmed.chars().filter(|&c| c == '}').count();
+        let was_at_root = depth == 0;
+        
+        // --- PASS 3: WEIGHTED SIGNAL SCORING ---
         let mut score = 0;
 
         // Meta-Gravity
         if trimmed.starts_with('@') || trimmed.starts_with("#[") || trimmed.starts_with("#!") {
-            score += 10;
+            score += 30;
         }
         
-        // Structural Gravity
+        // Structural Gravity (Signatures)
         if trimmed.ends_with('{') || trimmed.ends_with(':') || trimmed.ends_with('[') || 
-           trimmed.contains("interface ") || (trimmed.contains("func ") && !trimmed.contains('}')) {
+           trimmed.contains("struct ") || trimmed.contains("typedef ") || trimmed.contains("interface ") || (trimmed.contains("func ") && !trimmed.contains('}')) {
+            score += 20;
+        }
+
+        // Data & Protocol Gravity
+        if trimmed.starts_with('+') || trimmed.starts_with('-') || trimmed.starts_with('>') || 
+           trimmed.to_uppercase().contains("INSERT ") || trimmed.to_uppercase().contains("SELECT ") || 
+           trimmed.to_uppercase().contains("UPDATE ") || trimmed.to_uppercase().contains("CREATE TABLE") {
+            score += 20;
+        }
+
+        // Flow Control & Memory Management
+        if trimmed.contains("await") || trimmed.contains("return") || trimmed.contains("throw") || 
+           trimmed.contains("yield") || trimmed.contains("yield*") || trimmed.contains("malloc") || 
+           trimmed.contains("free") || trimmed.contains("strdup") || trimmed.contains("new ") {
+            score += 15;
+        }
+
+        // Relational Gravity (Chains, Pointers, Keys, Refs)
+        if trimmed.contains("->") || trimmed.contains('*') || trimmed.contains('&') ||
+           (trimmed.contains('.') && (trimmed.contains('(') || trimmed.contains('['))) {
             score += 10;
-        }
-
-        // Flow Control
-        if trimmed.contains("await") || trimmed.contains("return") || trimmed.contains("throw") || trimmed.contains("yield") {
-            score += 5;
-        }
-
-        // Relational Gravity (Chains and Keys)
-        if trimmed.contains('.') || trimmed.contains(':') || (trimmed.contains('(') && trimmed.contains(')')) {
-            score += 5;
         }
 
         // Information Density (Boredom Check)
         let has_high_signal = trimmed.split(|c: char| !c.is_alphanumeric() && c != '@' && c != '_')
             .any(|token| {
-                if token.is_empty() { return false; }
-                if boredom_table.contains(token.to_lowercase().as_str()) { return false; }
-                
-                // Mix of cases (CamelCase or PascalCase) is high signal
+                if token.is_empty() || boredom_table.contains(token.to_lowercase().as_str()) { return false; }
                 let has_upper = token.chars().any(|c| c.is_uppercase());
                 let has_lower = token.chars().any(|c| c.is_lowercase());
-                let is_mixed = has_upper && has_lower;
-                
-                token.len() > 3 && (is_mixed || token.contains('_') || token.contains('@'))
+                token.len() > 3 && (has_upper && has_lower || token.contains('_') || token.ends_with('*'))
             });
         
         if has_high_signal {
             score += 5;
         }
 
-        // Final Threshold
-        if score > 0 {
-            lines.push(line.to_string());
+        // --- PASS 4: TIERED PRESERVATION ---
+        // Threshold 1 for root and structural definitions (structs/typedefs)
+        // Threshold 10 for implementation bodies (sweet spot for C/TS logic)
+        let is_def_block = trimmed.contains("struct") || trimmed.contains("typedef") || trimmed.contains("interface") || trimmed.contains("enum");
+        let threshold = if was_at_root || is_def_block { 1 } else { 10 };
+
+        if score >= threshold {
+            // Never collapse signatures that have parameters (parentheses)
+            let is_signature_line = trimmed.contains('(') && trimmed.contains(')');
+            if was_at_root && trimmed.ends_with('{') && !is_signature_line {
+                lines.push(format!("{} ... }}", line.trim_end_matches('{').trim_end()));
+            } else {
+                lines.push(line.to_string());
+            }
         }
+        }
+
+        depth = depth + open_braces as i32 - close_braces as i32;
+        if depth < 0 { depth = 0; }
     }
     lines.join("\n")
 }
