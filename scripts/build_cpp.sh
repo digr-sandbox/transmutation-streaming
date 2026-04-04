@@ -52,16 +52,11 @@ cat > CMakeLists.txt.patch << 'EOF'
 
 # Skipped for FFI-only build (no pybind11 required)
 message(STATUS "Skipping Python bindings (FFI build)")
-
-# *****************
-# ***  Install  ***
-# *****************
-
-install(TARGETS parse_v1 parse_v2 DESTINATION lib)
 EOF
 
 # Apply patch: replace from line 188 to end with our stub
-head -n 187 CMakeLists.txt.bak > CMakeLists.txt
+head -n 185 CMakeLists.txt.bak > CMakeLists.txt
+echo "install(TARGETS parse_v1 parse_v2 DESTINATION lib)" >> CMakeLists.txt
 cat CMakeLists.txt.patch >> CMakeLists.txt
 rm CMakeLists.txt.patch
 
