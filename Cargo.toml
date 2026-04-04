@@ -162,8 +162,7 @@ tempfile = "3.20"
 mockall = "0.13"
 tokio-test = "0.4"
 
-[build-dependencies]
-# Windows resource compiler for embedding icons (only needed for CLI binary)
+[target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1", optional = true }
 
 [features]

@@ -85,7 +85,7 @@ mkdir -p "$BUILD_DIR"
 cp cpp/CMakeLists_full.txt cpp/CMakeLists.txt
 
 cd "$BUILD_DIR"
-cmake ../cpp -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+cmake ../cpp -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DDOCLING_BUILD_DIR="${PWD}/../docling-parse/${DOCLING_BUILD_DIR}"
 cmake --build . --config Release --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 cd ..
 

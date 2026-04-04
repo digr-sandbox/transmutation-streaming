@@ -12,11 +12,16 @@ add_definitions(-DROOT_PATH="${DOCLING_ABSOLUTE_PATH}")
 # Path to docling-parse installation
 set(DOCLING_PARSE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../docling-parse")
 set(DOCLING_EXTERNALS "${DOCLING_PARSE_ROOT}/externals")
-set(DOCLING_BUILD "${DOCLING_PARSE_ROOT}/build_linux_x86_docling")
+
+# The build directory is passed from the shell/environment
+if(NOT DOCLING_BUILD_DIR)
+    set(DOCLING_BUILD_DIR "${DOCLING_PARSE_ROOT}/build")
+endif()
+message(STATUS "Using docling-parse build directory: ${DOCLING_BUILD_DIR}")
 
 # Find docling-parse static libraries
-set(PARSE_V1_LIB "${DOCLING_BUILD}/libparse_v1.a")
-set(PARSE_V2_LIB "${DOCLING_BUILD}/libparse_v2.a")
+set(PARSE_V1_LIB "${DOCLING_BUILD_DIR}/libparse_v1.a")
+set(PARSE_V2_LIB "${DOCLING_BUILD_DIR}/libparse_v2.a")
 
 # Verify libraries exist
 if(NOT EXISTS "${PARSE_V1_LIB}")
@@ -27,9 +32,9 @@ if(NOT EXISTS "${PARSE_V2_LIB}")
 endif()
 
 # Find external dependencies (all built as part of docling-parse)
-set(QPDF_LIB "${DOCLING_BUILD}/extlib_qpdf/src/extlib_qpdf-build/libqpdf/libqpdf.a")
-set(JPEG_LIB "${DOCLING_BUILD}/extlib_jpeg/src/extlib_jpeg/libjpeg.a")
-set(LOGURU_LIB "${DOCLING_BUILD}/_deps/logurugitrepo-build/libloguru.a")
+set(QPDF_LIB "${DOCLING_BUILD_DIR}/extlib_qpdf/src/extlib_qpdf-build/libqpdf/libqpdf.a")
+set(JPEG_LIB "${DOCLING_BUILD_DIR}/extlib_jpeg/src/extlib_jpeg/libjpeg.a")
+set(LOGURU_LIB "${DOCLING_BUILD_DIR}/_deps/logurugitrepo-build/libloguru.a")
 
 # Verify external libraries exist
 if(NOT EXISTS "${QPDF_LIB}")
@@ -52,9 +57,9 @@ target_include_directories(docling_ffi PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${DOCLING_PARSE_ROOT}/src
     ${DOCLING_EXTERNALS}/include
-    ${DOCLING_BUILD}/_deps/logurugitrepo-src
-    ${DOCLING_BUILD}/_deps/jsongitrepo-src/include
-    ${DOCLING_BUILD}/_deps/utf8gitrepo-src/source
+    ${DOCLING_BUILD_DIR}/_deps/logurugitrepo-src
+    ${DOCLING_BUILD_DIR}/_deps/jsongitrepo-src/include
+    ${DOCLING_BUILD_DIR}/_deps/utf8gitrepo-src/source
 )
 
 # Link libraries
@@ -67,8 +72,16 @@ target_link_libraries(docling_ffi PRIVATE
     z  # zlib
     dl
     pthread
-    stdc++
 )
+
+# Platform specific linking
+if(APPLE)
+    # macOS specific
+    target_link_libraries(docling_ffi PRIVATE "-lc++")
+else()
+    # Linux specific
+    target_link_libraries(docling_ffi PRIVATE stdc++)
+endif()
 
 # Installation
 install(TARGETS docling_ffi 
@@ -77,4 +90,3 @@ install(TARGETS docling_ffi
 )
 
 install(FILES docling_ffi.h DESTINATION include)
-
