@@ -4,17 +4,17 @@
 
 This roadmap outlines the development plan for Transmutation, a high-performance document conversion engine designed for AI/LLM embeddings.
 
-**Current Status (v0.2.0 - November 7, 2025)**:
+**Current Status (v0.3.2 - April 4, 2026)**:
 - ✅ **Phase 1**: Foundation & Core Architecture (COMPLETE)
 - ✅ **Phase 1.5**: Distribution & Tooling (COMPLETE)
 - ✅ **Phase 2**: Core Document Formats (COMPLETE - 11 formats!)
 - ✅ **Phase 2.5**: Core Features Architecture (COMPLETE)
-- ✅ **Phase 3**: Advanced Features (COMPLETE - Archives ✅, Batch ✅, OCR ✅, ASR ✅)
+- ✅ **Phase 3**: Advanced Features (COMPLETE - Archives ✅, Batch ✅, OCR ✅)
 - 📝 **Phase 4**: Advanced Optimizations & v1.0.0
 
-**Latest Achievement**: Stabilized GitHub Actions pipelines and published the 0.2.0 release!
+**Latest Achievement**: Achieved 100% Zero-Python architecture and removed all heavy system dependencies (LibreOffice, FFmpeg, Whisper).
 
-**Scope**: Pure Rust library/CLI for document conversion. External integrations handled by HiveLLM Vectorizer.
+**Scope**: Pure Rust library/CLI for document conversion and secure agentic gateway.
 
 **Overall Progress**: 
 ```
@@ -22,17 +22,16 @@ Phase 1:   ████████████████████ 100% ✅
 Phase 1.5: ████████████████████ 100% ✅ Distribution
 Phase 2:   ████████████████████ 100% ✅ 11 Formats
 Phase 2.5: ████████████████████ 100% ✅ Core Arch
-Phase 3:   ████████████████████ 100% ✅ Archives + Batch + OCR + ASR
+Phase 3:   ████████████████████ 100% ✅ Archives + Batch + OCR
 Phase 4:   ░░░░░░░░░░░░░░░░░░░░   0% 📝 Optimizations
 
 Total:     ████████████████████  95% Complete!!!
 ```
 
-**Formats Supported: 27 total!**
+**Formats Supported: 22 total!**
 - Documents (11): PDF, DOCX, XLSX, PPTX, HTML, XML, TXT, CSV, TSV, RTF, ODT
 - Images (6): JPG, PNG, TIFF, BMP, GIF, WEBP
-- Audio (5): MP3, WAV, M4A, FLAC, OGG
-- Video (5): MP4, AVI, MKV, MOV, WEBM
+- Archives (5): ZIP, TAR, TAR.GZ, TAR.BZ2, 7Z
 
 ---
 
@@ -45,7 +44,6 @@ Total:     ████████████████████  95% Com
 - ✅ CLI tool with convert/batch/info commands
 - ✅ C++ FFI Integration (docling-parse)
 - ✅ ONNX ML Models (LayoutLMv3)
-- ✅ Split Page Exports (MD + Images per page)
 - ✅ Performance benchmarks (98x faster than Docling)
 
 ---
@@ -65,10 +63,8 @@ Total:     ████████████████████  95% Com
 
 ### Week 13-15: Office Formats ✅
 - ✅ DOCX → Markdown (docx-rs, pure Rust)
-- ✅ DOCX → Images (LibreOffice pipeline)
 - ✅ XLSX → Markdown/CSV/JSON (umya-spreadsheet, 148 pg/s)
 - ✅ PPTX → Markdown (ZIP/XML, 1639 pg/s)
-- ✅ PPTX → Images (LibreOffice pipeline)
 
 ### Week 16-17: Web Formats ✅
 - ✅ HTML → Markdown (scraper, 2110 pg/s)
@@ -90,25 +86,9 @@ Total:     ████████████████████  95% Com
 - [ ] Watermark removal
 - [ ] Layout quality metrics
 
-### Week 22-24: Integration Testing
-- [ ] Cross-format conversion tests
-- [ ] Large document stress tests
-- [ ] Memory leak detection
-- [ ] Performance benchmarking
-- [ ] Regression test suite
-
 ---
 
-## Phase 2.5: Core Features Architecture ✅ COMPLETE
-
-- ✅ Core formats always enabled (no feature flags): PDF, HTML, XML, ZIP, TXT, CSV, TSV, RTF, ODT
-- ✅ Removed conditional compilation from engines
-- ✅ Simpler API and user experience
-- ✅ Faster compilation
-
----
-
-## Phase 3: Advanced Features ✅ 100% COMPLETE
+## Phase 3: Advanced Features ✅ COMPLETE
 
 ### Week 25-27: Image OCR ✅ COMPLETE
 - ✅ Integrated leptess (Tesseract wrapper)
@@ -120,26 +100,11 @@ Total:     ████████████████████  95% Com
 - ✅ **Quality**: Equivalent to Docling (tested on Portuguese text)
 - ✅ **External dependency**: Tesseract OCR
 
-**Clarification - What OCR Does**:
-- ✅ OCR extracts **existing text** from images (e.g., scanned documents, screenshots with text)
-- ❌ OCR does NOT describe visual content (e.g., "a cat sitting" - that requires Image Captioning models)
-- For visual descriptions, see Future Considerations (BLIP-2, GIT models)
-
-### Week 28-30: Audio Transcription ✅ COMPLETE
-- ✅ Integrated Whisper CLI (openai-whisper)
-- ✅ Audio → Text transcription for MP3, WAV, M4A, FLAC, OGG
-- ✅ Language auto-detection
-- ✅ Markdown output with transcript
-- ✅ JSON output with metadata
-- ✅ **External dependency**: Whisper CLI
-
-### Week 31-32: Video Transcription ✅ COMPLETE
-- ✅ Integrated FFmpeg + Whisper
-- ✅ Video → Audio → Text pipeline
-- ✅ Support for MP4, AVI, MKV, MOV, WEBM
-- ✅ Audio extraction with FFmpeg (16kHz mono WAV)
-- ✅ Automatic transcription with Whisper
-- ✅ **External dependencies**: FFmpeg + Whisper CLI
+### Week 28-32: Secure Agentic Gateway ✅ COMPLETE
+- ✅ Thompson NFA Security Firewall
+- ✅ Multi-OS Secure Router (Windows/Linux/macOS)
+- ✅ SQLite Audit Logging & Provenance
+- ✅ Model Context Protocol (MCP) Integration
 
 ### Week 33-34: Archive Handling ✅ COMPLETE
 - ✅ ZIP file listing (1864 pg/s)
@@ -148,10 +113,7 @@ Total:     ████████████████████  95% Com
 - ✅ Archive statistics
 - ✅ Files grouped by extension
 - ✅ Markdown/JSON export
-- [ ] 7Z support
-- [ ] Recursive processing
-- [ ] Nested archives
-- [ ] Extract and convert contents
+- ✅ 7Z support
 
 ### Week 35-36: Batch Processing ✅ COMPLETE
 - ✅ Concurrent processing (Tokio)
@@ -186,41 +148,8 @@ Total:     ████████████████████  95% Com
 
 ---
 
-## Future Considerations (Post v1.0.0)
-
-### Image Captioning (Visual Description)
-**Note**: Currently Transmutation only does OCR (text extraction). Visual description is a future enhancement.
-
-- [ ] **BLIP-2 ONNX Integration**
-  - Download ONNX model (~3GB)
-  - Use existing `ort` infrastructure
-  - Generate automatic image descriptions
-  - Output: "a cat sitting on a wooden surface"
-  - Performance target: <1s per image
-  
-- [ ] **GIT Model Integration**
-  - Smaller model (~1GB)
-  - Faster inference
-  - Good quality descriptions
-  - Alternative to BLIP-2
-
-**Implementation Strategy** (when/if implemented):
-1. Download pre-trained ONNX models
-2. Image preprocessing (resize, normalize)
-3. Model inference with `ort`
-4. Generate natural language descriptions
-5. Combine with OCR for full image understanding
-
-**Use Cases**:
-- Describing diagrams, charts, photos
-- Generating alt-text for accessibility
-- Visual content indexing for embeddings
-- Multimodal RAG systems
-
----
-
-**Last Updated**: 2025-11-07  
-**Version**: 0.2.0  
+**Last Updated**: 2026-04-04  
+**Version**: 0.3.2  
 **Status**: ✅ Phase 1, 1.5, 2, 2.5, 3 Complete | 📝 Phase 4 (planning)  
 **Scope**: Pure Rust library/CLI (no bindings, no external integrations)
 

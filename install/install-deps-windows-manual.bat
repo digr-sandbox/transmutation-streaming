@@ -82,21 +82,7 @@ if exist poppler.zip (
 )
 
 echo.
-echo [5/6] LibreOffice
-echo   Downloading LibreOffice...
-set LIBREOFFICE_URL=https://download.documentfoundation.org/libreoffice/stable/7.6.4/win/x86_64/LibreOffice_7.6.4_Win_x86-64.msi
-curl -L -o libreoffice-installer.msi "%LIBREOFFICE_URL%"
-if exist libreoffice-installer.msi (
-    echo   Installing LibreOffice...
-    msiexec /i libreoffice-installer.msi /quiet /norestart
-    timeout /t 10 >nul
-) else (
-    echo   ⚠️ Download failed, please install manually from:
-    echo   https://www.libreoffice.org/download/download/
-)
-
-echo.
-echo [6/6] Tesseract OCR
+echo [5/5] Tesseract OCR
 echo   Downloading Tesseract...
 set TESSERACT_URL=https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-5.3.3.20231005.exe
 curl -L -o tesseract-installer.exe "%TESSERACT_URL%"
@@ -121,7 +107,6 @@ echo   ✓ Visual Studio Build Tools (manual)
 echo   ✓ CMake
 echo   ✓ Git
 echo   ✓ Poppler (pdftoppm)
-echo   ✓ LibreOffice
 echo   ✓ Tesseract OCR
 echo.
 echo ⚠️  IMPORTANT: 

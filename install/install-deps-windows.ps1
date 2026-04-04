@@ -45,12 +45,8 @@ choco install cmake git -y
 Write-Host "[3/7] Installing poppler (PDF → Image)..." -ForegroundColor Yellow
 choco install poppler -y
 
-# Office conversion
-Write-Host "[4/7] Installing LibreOffice (Office formats)..." -ForegroundColor Yellow
-choco install libreoffice -y
-
 # OCR support
-Write-Host "[5/5] Installing Tesseract (OCR for images)..." -ForegroundColor Yellow
+Write-Host "[4/4] Installing Tesseract (OCR for images)..." -ForegroundColor Yellow
 choco install tesseract -y
 
 Write-Host ""
@@ -60,7 +56,6 @@ Write-Host "📊 Installed tools:" -ForegroundColor Cyan
 Write-Host "  - Visual Studio Build Tools"
 Write-Host "  - CMake & Git"
 Write-Host "  - pdftoppm.exe (poppler)"
-Write-Host "  - soffice.exe (LibreOffice)"
 Write-Host "  - tesseract.exe (OCR)"
 Write-Host ""
 Write-Host "⚠️  IMPORTANT: Restart your PowerShell terminal!" -ForegroundColor Yellow

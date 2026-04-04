@@ -55,11 +55,7 @@ echo   3. Add C:\Program Files\poppler\Library\bin\ to PATH
 echo   Or use: choco install poppler
 
 echo.
-echo [4/7] Installing LibreOffice (Office formats)...
-winget install --id TheDocumentFoundation.LibreOffice --silent --accept-package-agreements --accept-source-agreements
-
-echo.
-echo [5/5] Installing Tesseract (OCR)...
+echo [4/4] Installing Tesseract (OCR)...
 winget install --id UB-Mannheim.TesseractOCR --silent --accept-package-agreements --accept-source-agreements
 
 echo.
@@ -71,7 +67,6 @@ echo 📊 Installed tools:
 echo   ✓ Visual Studio Build Tools
 echo   ✓ CMake ^& Git
 echo   ⚠️ Poppler (manual installation required)
-echo   ✓ LibreOffice
 echo   ✓ Tesseract OCR
 echo.
 echo ⚠️  IMPORTANT: Restart your terminal/PowerShell to apply PATH changes

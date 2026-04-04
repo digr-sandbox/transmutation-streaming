@@ -97,7 +97,6 @@ rstar = { version = "0.12", optional = true }
 # PDF
 lopdf = "0.35"
 pdf-extract = "0.7"
-pdfium-render = { version = "0.8", optional = true }  # Only for PDF rendering to images
 
 # HTML/XML
 scraper = "0.21"
@@ -121,8 +120,6 @@ comrak = { version = "0.29", default-features = false }
 regex = "1.11"
 once_cell = "1.20"
 lazy_static = "1.5"
-
-# Note: Audio/Video use external ffmpeg and whisper CLI tools (no Rust crates needed)
 
 # Parallelism
 rayon = "1.10"
@@ -170,35 +167,23 @@ tesseract = ["dep:tesseract", "dep:leptess"]
 
 # Format support (pure Rust implementations)
 # Note: PDF, HTML, XML, and basic ZIP support are ALWAYS enabled (no feature flags)
-pdf-to-image = ["dep:pdfium-render"]  # PDF rendering to images per page (optional)
 office = ["docx-rs", "umya-spreadsheet"]  # Office formats (DOCX, XLSX, PPTX)
 image-ocr = ["tesseract"]
 archives-extended = ["tar", "flate2", "sevenz-rust"]  # Extended archive support (TAR, GZ, 7Z)
 
 # Advanced layout analysis (C++ FFI to docling-parse + ML models)
-docling-ffi = ["dep:ort", "dep:ndarray", "dep:rstar", "dep:pdfium-render"]  # Enable C++ docling-parse + ONNX ML models
+docling-ffi = ["dep:ort", "dep:ndarray", "dep:rstar"]  # Enable C++ docling-parse + ONNX ML models
 
 # CLI
 cli = ["clap", "indicatif", "console", "colored", "winres"]
 
 # All features (no external integrations - Transmutation is a library/CLI)
 full = [
-    "pdf-to-image",
     "office",
     "image-ocr",
     "archives-extended",
     "cli",
 ]
-
-# Benchmarks removed - files don't exist yet
-# TODO: Re-add when benchmark files are created
-# [[bench]]
-# name = "conversion_benchmarks"
-# harness = false
-#
-# [[bench]]
-# name = "pipeline_benchmark"
-# harness = false
 
 [profile.release]
 opt-level = 3
@@ -268,4 +253,3 @@ assets = [
 ]
 conf-files = []
 maintainer-scripts = "debian/"
-

@@ -216,68 +216,41 @@ fn check_external_dependencies() {
             ));
         }
     }
-
-    // Check office feature dependencies for image conversion
-    #[cfg(all(feature = "office", feature = "pdf-to-image"))]
-    {
-        if !command_exists("libreoffice") && !command_exists("soffice") {
-            warnings.push((
-                "LibreOffice",
-                "DOCX/PPTX → Image conversion",
-                get_install_command("libreoffice"),
-            ));
-        }
-    }
-
-    // Check tesseract feature dependencies
-    #[cfg(feature = "tesseract")]
-    {
-        if !command_exists("tesseract") {
-            warnings.push((
-                "Tesseract OCR",
-                "Image → Text (OCR)",
-                get_install_command("tesseract"),
-            ));
-        }
-    }
-
-    // Check ffmpeg feature dependencies
-    #[cfg(any(feature = "audio", feature = "video"))]
-    {
-        if !command_exists("ffmpeg") {
-            warnings.push((
-                "FFmpeg",
-                "Audio/Video processing",
-                get_install_command("ffmpeg"),
-            ));
-        }
-    }
-
-    // Print warnings if any dependencies are missing
-    if !warnings.is_empty() {
-        eprintln!();
-        eprintln!("╔════════════════════════════════════════════════════════════╗");
-        eprintln!("║  ⚠️  Optional External Dependencies Missing             ║");
-        eprintln!("╚════════════════════════════════════════════════════════════╝");
-        eprintln!();
-        eprintln!("Transmutation will compile, but some features won't work:");
-        eprintln!();
-
-        for (tool, feature, install_cmd) in &warnings {
-            eprintln!("  ❌ {tool}: {feature}");
-            eprintln!("     Install: {install_cmd}");
-        }
-
-        eprintln!();
-        eprintln!("📖 For detailed installation instructions:");
-        eprintln!("   https://github.com/yourusername/transmutation/blob/main/install/README.md");
-        eprintln!();
-        eprintln!("💡 Quick install (all dependencies):");
-        eprintln!("{}", get_quick_install_all());
-        eprintln!();
+// Check tesseract feature dependencies
+#[cfg(feature = "tesseract")]
+{
+    if !command_exists("tesseract") {
+        warnings.push((
+            "Tesseract OCR",
+            "Image → Text (OCR)",
+            get_install_command("tesseract"),
+        ));
     }
 }
 
+if !warnings.is_empty() {
+    eprintln!();
+    eprintln!("╔════════════════════════════════════════════════════════════╗");
+    eprintln!("║  ⚠️  Optional External Dependencies Missing             ║");
+    eprintln!("╚════════════════════════════════════════════════════════════╝");
+    eprintln!();
+    eprintln!("Transmutation will compile, but some features won't work:");
+    eprintln!();
+
+    for (tool, feature, install_cmd) in &warnings {
+        eprintln!("  ❌ {tool}: {feature}");
+        eprintln!("     Install: {install_cmd}");
+    }
+
+    eprintln!();
+    eprintln!("📖 For detailed installation instructions:");
+    eprintln!("   https://github.com/hivellm/transmutation/blob/main/install/README.md");
+    eprintln!();
+    eprintln!("💡 Quick install (all dependencies):");
+    eprintln!("{}", get_quick_install_all());
+    eprintln!();
+}
+}
 /// Check if a command exists in PATH
 #[allow(dead_code)]
 fn command_exists(cmd: &str) -> bool {
@@ -299,9 +272,7 @@ fn get_install_command(tool: &str) -> String {
     {
         match tool {
             "poppler-utils" => "sudo apt-get install poppler-utils".to_string(),
-            "libreoffice" => "sudo apt-get install libreoffice".to_string(),
             "tesseract" => "sudo apt-get install tesseract-ocr".to_string(),
-            "ffmpeg" => "sudo apt-get install ffmpeg".to_string(),
             _ => format!("sudo apt-get install {tool}"),
         }
     }
@@ -310,9 +281,7 @@ fn get_install_command(tool: &str) -> String {
     {
         match tool {
             "poppler-utils" => "brew install poppler".to_string(),
-            "libreoffice" => "brew install --cask libreoffice".to_string(),
             "tesseract" => "brew install tesseract".to_string(),
-            "ffmpeg" => "brew install ffmpeg".to_string(),
             _ => format!("brew install {tool}"),
         }
     }
@@ -321,9 +290,7 @@ fn get_install_command(tool: &str) -> String {
     {
         match tool {
             "poppler-utils" => "choco install poppler".to_string(),
-            "libreoffice" => "choco install libreoffice".to_string(),
             "tesseract" => "choco install tesseract".to_string(),
-            "ffmpeg" => "choco install ffmpeg".to_string(),
             _ => format!("choco install {tool}"),
         }
     }
