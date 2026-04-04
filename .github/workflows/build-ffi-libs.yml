@@ -20,6 +20,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake build-essential pkg-config libssl-dev zlib1g-dev libtesseract-dev libleptonica-dev
 
+      - name: Clone docling-parse
+        run: |
+          git clone https://github.com/DS4SD/docling-parse.git
+
       - name: Build FFI Library
         run: |
           chmod +x scripts/build_cpp.sh
@@ -41,6 +45,10 @@ jobs:
       - name: Install Dependencies
         run: |
           brew install cmake tesseract poppler ffmpeg
+
+      - name: Clone docling-parse
+        run: |
+          git clone https://github.com/DS4SD/docling-parse.git
 
       - name: Build FFI Library
         run: |

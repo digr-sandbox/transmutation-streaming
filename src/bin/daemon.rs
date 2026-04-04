@@ -452,7 +452,13 @@ async fn execute_secure_command(cmd: &str, security_ms: u128, rpc_timer: Instant
     let start_shell = Instant::now();
     let req_id = format!("req_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
     let temp_file = tempfile::Builder::new().prefix("mcp_spool_").suffix(".txt").tempfile()?;
-    let mut child = tokio::process::Command::new("cmd").arg("/c").arg(cmd).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()?;
+    
+    let mut child = if cfg!(target_os = "windows") {
+        tokio::process::Command::new("cmd").arg("/c").arg(cmd).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()?
+    } else {
+        tokio::process::Command::new("sh").arg("-c").arg(cmd).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()?
+    };
+
     let mut stdout = child.stdout.take().unwrap();
     let mut stderr = child.stderr.take().unwrap();
     let mut file = tokio::fs::File::from_std(temp_file.reopen()?);
