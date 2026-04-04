@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize};
 
 /// --- UNIFIED PRODUCTION EVALUATION SUITE (v2026.1) ---
-/// Verified across: 45 Micro-Payloads + 28 Polyglot Assets + 21 Slop Assets
+/// Benchmarks Best-Practices vs. High-Entropy Slop with Domain-Aware Routing
 
 #[derive(Deserialize)]
 struct MicroTest {
@@ -31,14 +31,24 @@ impl BoringTable {
         for line in content.lines() {
             let trimmed = line.trim();
             if trimmed.is_empty() { continue; }
-            if (trimmed.starts_with("//") || trimmed.starts_with('#') || trimmed.starts_with("/*") || trimmed.starts_with('*') || trimmed.starts_with("--") || trimmed.starts_with('%')) && !trimmed.contains('@') { continue; }
 
-            let is_sig = (trimmed.ends_with('{') || trimmed.ends_with(':') || trimmed.contains("struct ") || trimmed.contains("interface ") || trimmed.to_uppercase().contains("CREATE TABLE")) && !trimmed.contains('}');
-            let is_logic = trimmed.contains("return") || trimmed.contains("throw") || trimmed.contains("await") || trimmed.contains("malloc") || trimmed.contains("PRIMARY KEY");
+            // ABSOLUTE COMMENT STRIPPER
+            if (trimmed.starts_with("//") || trimmed.starts_with('#') || trimmed.starts_with("/*") || 
+                trimmed.starts_with('*') || trimmed.starts_with("--") || trimmed.starts_with('%')) 
+               && !trimmed.contains('@') && !trimmed.contains("#[") {
+                continue;
+            }
 
-            if is_sig || is_logic || is_sql {
+            let is_sig = (trimmed.ends_with('{') || trimmed.ends_with(':') || trimmed.contains("struct ") || trimmed.contains("interface ") || trimmed.to_uppercase().contains("CREATE TABLE") || trimmed.starts_with("type ")) && !trimmed.contains('}');
+            let is_meta = trimmed.starts_with('@') || trimmed.starts_with("#[") || trimmed.starts_with("import ") || trimmed.starts_with("#include");
+            let is_logic = trimmed.contains("return") || trimmed.contains("throw") || trimmed.contains("await") || 
+                           trimmed.contains("malloc") || trimmed.contains("free") || trimmed.contains("strdup") || trimmed.to_uppercase().contains("PRIMARY KEY");
+
+            if is_sig || is_meta || is_logic || is_sql {
                 for word in trimmed.split(|c: char| !c.is_alphanumeric() && c != '@' && c != '_' && c != '$') {
-                    if self.is_needle(word, is_sql) && !needles.contains(&word.to_string()) { needles.push(word.to_string()); }
+                    if self.is_needle(word, is_sql) && !needles.contains(&word.to_string()) {
+                        needles.push(word.to_string());
+                    }
                 }
             }
         }
@@ -55,9 +65,7 @@ impl BoringTable {
         let is_mixed = has_upper && has_lower;
         let is_all_caps = has_upper && !has_lower;
 
-        // SQL needles are often ALL CAPS (UUID, PRIMARY, TABLE)
         if is_sql && is_all_caps { return true; }
-        
         clean.contains('@') || clean.contains('_') || is_mixed || clean.contains('$')
     }
 }
