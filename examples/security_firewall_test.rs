@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "id": format!("test_{}", rule),
             "method": "tools/call",
             "params": {
-                "name": "execute_command",
+                "name": "execute_secure_command",
                 "arguments": { "command": cmd }
             }
         });
@@ -65,7 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "jsonrpc": "2.0",
         "id": "safe_1",
         "method": "tools/call",
-        "params": { "name": "execute_command", "arguments": { "command": "cmd /c dir" } }
+        "params": { "name": "execute_secure_command", "arguments": { "command": "cmd /c dir" } }
     });
     writeln!(stdin, "{}", safe_req)?;
     let mut line = String::new();

@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     line.clear();
     reader.read_line(&mut line)?;
     println!("   Response: {}", line.trim());
-    assert!(line.contains("execute_command"));
+    assert!(line.contains("execute_secure_command"));
     assert!(line.contains("inputSchema"));
 
     // TEST 3: Liveness Ping (MCP 2026)
@@ -79,7 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "id": "exec_1",
         "method": "tools/call",
         "params": {
-            "name": "execute_command",
+            "name": "execute_secure_command",
             "arguments": { "command": "cmd /c echo protocol-verified" }
         }
     });
@@ -88,7 +88,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     line.clear();
     reader.read_line(&mut line)?;
     println!("   Response: {}", line.trim());
-    assert!(line.contains("# ⚡ PROVENANCE"));
     assert!(line.contains("protocol-verified"));
 
     println!("\n✨ PROTOCOL SUCCESS: 2026 Model Context Protocol standards verified.");

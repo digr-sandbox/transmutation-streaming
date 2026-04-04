@@ -27,8 +27,8 @@ Transmutation doesn't just "truncate" text; it performs **Semantic Transmutation
 ### 🛠️ Dual MCP Tool Architecture
 Transmutation exposes two distinct Model Context Protocol (MCP) tools to the agent, providing a safety net against over-compression:
 
-1. **`execute_command` (Default)**: The primary tool. It runs the command, applies security gates, and aggressively crushes the output. If the output is compressed, it prepends a `# ⚡ PROVENANCE` header.
-2. **`execute_command_unaltered` (Escape Hatch)**: Runs the command and security gates, but completely **bypasses compression**. The agent is instructed to call this fallback tool ONLY if the default tool returns ambiguous, broken, or overly-pruned results.
+1. **`execute_secure_command`**: The primary tool for running shell commands. It applies mandatory security gates and returns the raw output. All execution is audited to a local SQLite database.
+2. **`query_recon`**: Retrieves the top-level architectural clusters of the project.
 3. **`read_code_map` (Architecture Index)**: Queries the background SQLite dependency graph to instantly return what files the target imports, and what files import the target.
 
 ### 🔌 Connecting the MCP Server
@@ -75,7 +75,7 @@ The engine dynamically routes output based on the command type:
 * **Code Reads (`cat`, `head`)**: Routed to **Structural Extraction**. Semantic compression destroys code syntax. Instead, Transmutation heavily crushes the file by pruning all implementation logic (everything inside `{ ... }`) and returning a **Latent-K Dependency Map (k=1)**. It extracts:
   1. Outbound Dependencies (e.g., `use`, `import`).
   2. The Public Interface (`pub fn`, `struct`, `class`).
-  *If the agent needs the exact implementation details, it must call `execute_command_unaltered`.*
+  *If the agent needs the exact implementation details, it receives them by default via `execute_secure_command`. For structural summaries, call `query_discovery`.*
 
 ### 1. IDF Scoring (calculate_idf)
 * **How it works:** Inverse Document Frequency. It builds a global frequency map of all tokens in the stream. Words that appear constantly (like INFO, [DEBUG], or timestamp fragments) get a near-zero score. Words that appear rarely (like NullPointerException or 127.0.0.1) get a massive score spike.

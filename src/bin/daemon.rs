@@ -434,8 +434,8 @@ async fn handle_execute(State(state): State<Arc<AppState>>, Json(payload): Json<
         return Json(ExecuteResponse { content: error_msg, is_error: true });
     }
 
-    match execute_and_transmute(&payload.command, security_ms, start_rpc).await {
-        Ok((transmuted_text, is_error)) => Json(ExecuteResponse { content: transmuted_text, is_error }),
+    match execute_secure_command(&payload.command, security_ms, start_rpc).await {
+        Ok((output_text, is_error)) => Json(ExecuteResponse { content: output_text, is_error }),
         Err(e) => Json(ExecuteResponse { content: format!("Proxy Error: {}", e), is_error: true })
     }
 }
@@ -447,7 +447,7 @@ async fn handle_provenance(Json(payload): Json<ProvenanceRequest>) -> Json<Gener
     }
 }
 
-async fn execute_and_transmute(cmd: &str, security_ms: u128, rpc_timer: Instant) -> Result<(String, bool), Box<dyn std::error::Error + Send + Sync>> {
+async fn execute_secure_command(cmd: &str, security_ms: u128, rpc_timer: Instant) -> Result<(String, bool), Box<dyn std::error::Error + Send + Sync>> {
     let start_shell = Instant::now();
     let req_id = format!("req_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
     let temp_file = tempfile::Builder::new().prefix("mcp_spool_").suffix(".txt").tempfile()?;
@@ -460,16 +460,10 @@ async fn execute_and_transmute(cmd: &str, security_ms: u128, rpc_timer: Instant)
     let status = child.wait().await?;
     let shell_ms = start_shell.elapsed().as_millis();
     let raw_input = std::fs::read_to_string(temp_file.path()).unwrap_or_default();
-    let start_proxy = Instant::now();
-    let converter = Converter::new()?;
-    let result = converter.convert(temp_file.path()).to(OutputFormat::Markdown { split_pages: false, optimize_for_llm: true }).execute().await?;
-    let proxy_ms = start_proxy.elapsed().as_millis();
-    let mut final_text = String::new();
-    final_text.push_str(&format!("# ⚡ PROVENANCE [ID: {} | Transformed: TOON+STAT_V7]\n---\n", req_id));
-    for chunk in &result.content { final_text.push_str(&String::from_utf8_lossy(&chunk.data)); }
-    let record = AuditLogRecord { timestamp: chrono::Utc::now(), request_id: req_id, command: cmd.to_string(), exit_code: status.code().unwrap_or(-1), security_ms, shell_ms, proxy_ms, total_ms: rpc_timer.elapsed().as_millis(), input_bytes: result.statistics.input_size_bytes as usize, output_bytes: final_text.len() };
-    if let Err(e) = offload_to_sqlite(&record, &raw_input, &final_text) { tracing::error!("Failed to save audit log to SQLite: {}", e); }
-    Ok((final_text, !status.success()))
+    
+    let record = AuditLogRecord { timestamp: chrono::Utc::now(), request_id: req_id, command: cmd.to_string(), exit_code: status.code().unwrap_or(-1), security_ms, shell_ms, proxy_ms: 0, total_ms: rpc_timer.elapsed().as_millis(), input_bytes: raw_input.len(), output_bytes: raw_input.len() };
+    if let Err(e) = offload_to_sqlite(&record, &raw_input, &raw_input) { tracing::error!("Failed to save audit log to SQLite: {}", e); }
+    Ok((raw_input, !status.success()))
 }
 
 fn get_provenance_from_db(req_id: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {

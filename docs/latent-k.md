@@ -53,10 +53,10 @@ When Transmutation proxies a shell command, it dynamically routes the `stdout` t
 3. **The Statistical Squeezer**: For unstructured logs and `grep` searches, it calculates the Inverse Document Frequency (IDF) and Local Entropy to aggressively drop noise while protecting critical technical signals (IPs, Paths, Error Codes).
 
 ### Example: Unified Latent-K Output
-If an agent runs `cat src/converters/pdf.rs`, Transmutation returns:
+If an agent calls `query_discovery("src/converters/pdf.rs")`, Transmutation returns:
 ```text
 # ⚡ PROVENANCE [V: 3.0 | Latent-K Extraction + Code Map]
-# Implementation pruned. Call `execute_command_unaltered` for full source.
+# Implementation raw. For structural summaries, call `query_discovery`.
 ---
 [ARCHITECTURE CODE MAP]
 File: src/converters/pdf.rs
@@ -70,8 +70,13 @@ impl PdfConverter {
 }
 ```
 
-### The Escape Hatch
-Because Transmutation heavily modifies the terminal output, it exposes a Dual MCP Tool architecture. If the agent needs the raw, uncompressed bytes, it must call the fallback tool: `execute_command_unaltered`.
+### Tool Architecture
+Transmutation exposes a clean separation between secure execution and structural discovery:
+
+1. **`execute_secure_command`**: The primary tool for running shell commands. It applies mandatory security gates and returns the raw output.
+2. **`query_discovery`**: A specialized tool that applies the Latent-K structural extraction and Architecture Code Map to a specific file.
+
+Because `execute_secure_command` returns raw bytes, the agent should use `query_discovery` first to understand a file's structure before reading the full implementation if needed.
 
 ---
 ### Sources

@@ -89,7 +89,7 @@ impl SecurityEngine {
             let mut eval_logic = rule.logic.clone();
 
             // Replace tool name checks
-            eval_logic = eval_logic.replace("t.function.name == 'execute_command'", &(tool_name == "execute_command").to_string());
+            eval_logic = eval_logic.replace("t.function.name == 'execute_secure_command'", &(tool_name == "execute_secure_command").to_string());
             eval_logic = eval_logic.replace("t.function.name == 'delete_file'", &(tool_name == "delete_file").to_string());
 
             // Replace matches calls
@@ -123,12 +123,12 @@ mod tests {
             },
             {
                 "name": "02_Config_DB_Isolation",
-                "logic": "t.function.name == 'execute_command' && t.function.arguments.matches('(?i).*(cat |grep |rg |ag |ack |less |more |vi |nano |view |edit |cp |mv |ln ).*(\\.env|config\\..*|\\.sqlite|\\.db).*')",
+                "logic": "t.function.name == 'execute_secure_command' && t.function.arguments.matches('(?i).*(cat |grep |rg |ag |ack |less |more |vi |nano |view |edit |cp |mv |ln ).*(\\.env|config\\..*|\\.sqlite|\\.db).*')",
                 "message": "Blocked."
             },
             {
                 "name": "04_Timeout_Minimum_Enforcement",
-                "logic": "t.function.name == 'execute_command' && t.function.arguments.matches('(?i).*timeout\\s+([1-9]|[1-9][0-9]|[1-2][0-9][0-9])s?\\b.*')",  
+                "logic": "t.function.name == 'execute_secure_command' && t.function.arguments.matches('(?i).*timeout\\s+([1-9]|[1-9][0-9]|[1-2][0-9][0-9])s?\\b.*')",  
                 "message": "Blocked."
             }
         ]"#;
@@ -138,15 +138,15 @@ mod tests {
     #[test]
     fn test_safe_commands_pass() {
         let engine = get_test_engine();
-        assert!(engine.evaluate("npm install", "execute_command").is_none());
-        assert!(engine.evaluate("timeout 300s npm run build", "execute_command").is_none());
+        assert!(engine.evaluate("npm install", "execute_secure_command").is_none());
+        assert!(engine.evaluate("timeout 300s npm run build", "execute_secure_command").is_none());
     }
 
     #[test]
     fn test_blocks_malicious_commands() {
         let engine = get_test_engine();
-        assert!(engine.evaluate("cat .env", "execute_command").is_some());
+        assert!(engine.evaluate("cat .env", "execute_secure_command").is_some());
         assert!(engine.evaluate("id_rsa", "read_file").is_some());
-        assert!(engine.evaluate("timeout 10s npm install", "execute_command").is_some());
+        assert!(engine.evaluate("timeout 10s npm install", "execute_secure_command").is_some());
     }
 }

@@ -89,8 +89,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "result": {
                         "tools": [
                             {
-                                "name": "execute_command",
-                                "description": "Execute a shell command with mandatory security and token pruning.",
+                                "name": "execute_secure_command",
+                                "description": "Execute a shell command with mandatory security gates. Returns raw output.",
                                 "inputSchema": {
                                     "type": "object",
                                     "properties": { "command": { "type": "string" } },

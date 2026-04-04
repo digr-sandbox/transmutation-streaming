@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "id": 2,
         "method": "tools/call",
         "params": {
-            "name": "execute_command",
+            "name": "execute_secure_command",
             "arguments": { "command": "cmd /c echo stream-integrity-check" }
         }
     });
@@ -64,7 +64,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     line.clear();
     reader.read_line(&mut line)?;
     println!("  Result: {}", line.trim());
-    assert!(line.contains("# ⚡ PROVENANCE"));
     assert!(line.contains("stream-integrity-check"));
     assert!(line.contains("\"isError\":false"));
 
@@ -75,7 +74,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "id": 3,
         "method": "tools/call",
         "params": {
-            "name": "execute_command",
+            "name": "execute_secure_command",
             "arguments": { "command": "cat .env" }
         }
     });
