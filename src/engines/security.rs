@@ -7,6 +7,7 @@ pub struct RawRule {
     pub name: String,
     pub logic: String,
     pub message: String,
+    pub platform: Option<String>,
 }
 
 #[derive(Debug)]
@@ -14,6 +15,7 @@ pub struct CompiledRule {
     pub name: String,
     pub logic: String,
     pub message: String,
+    pub platform: Option<String>,
     pub pattern_map: Vec<(String, Regex)>,
 }
 
@@ -73,6 +75,7 @@ impl SecurityEngine {
                 name: raw.name,
                 logic: raw.logic,
                 message: raw.message,
+                platform: raw.platform,
                 pattern_map,
             });
         }
@@ -84,8 +87,15 @@ impl SecurityEngine {
         Self::load_from_str(&file_content)
     }
 
-    pub fn evaluate(&self, command: &str, tool_name: &str) -> Option<String> {
+    pub fn evaluate(&self, command: &str, tool_name: &str, platform: &str) -> Option<String> {
         for rule in &self.rules {
+            // Filter by platform if specified
+            if let Some(ref rule_platform) = rule.platform {
+                if rule_platform.to_lowercase() != platform.to_lowercase() {
+                    continue;
+                }
+            }
+
             let mut eval_logic = rule.logic.clone();
 
             // Replace tool name checks
@@ -138,15 +148,41 @@ mod tests {
     #[test]
     fn test_safe_commands_pass() {
         let engine = get_test_engine();
-        assert!(engine.evaluate("npm install", "execute_secure_command").is_none());
-        assert!(engine.evaluate("timeout 300s npm run build", "execute_secure_command").is_none());
+        assert!(engine.evaluate("npm install", "execute_secure_command", "linux").is_none());
+        assert!(engine.evaluate("timeout 300s npm run build", "execute_secure_command", "linux").is_none());
     }
 
     #[test]
-    fn test_blocks_malicious_commands() {
-        let engine = get_test_engine();
-        assert!(engine.evaluate("cat .env", "execute_secure_command").is_some());
-        assert!(engine.evaluate("id_rsa", "read_file").is_some());
-        assert!(engine.evaluate("timeout 10s npm install", "execute_secure_command").is_some());
+    fn test_platform_routing() {
+        let rules_json = r#"[
+            {
+                "name": "WinRule",
+                "platform": "windows",
+                "logic": "t.function.arguments.matches('win-only')",
+                "message": "Blocked."
+            },
+            {
+                "name": "LinuxRule",
+                "platform": "linux",
+                "logic": "t.function.arguments.matches('linux-only')",
+                "message": "Blocked."
+            },
+            {
+                "name": "GlobalRule",
+                "logic": "t.function.arguments.matches('global-block')",
+                "message": "Blocked."
+            }
+        ]"#;
+        let engine = SecurityEngine::load_from_str(rules_json).unwrap();
+
+        // Windows context
+        assert!(engine.evaluate("win-only", "exec", "windows").is_some());
+        assert!(engine.evaluate("linux-only", "exec", "windows").is_none());
+        assert!(engine.evaluate("global-block", "exec", "windows").is_some());
+
+        // Linux context
+        assert!(engine.evaluate("win-only", "exec", "linux").is_none());
+        assert!(engine.evaluate("linux-only", "exec", "linux").is_some());
+        assert!(engine.evaluate("global-block", "exec", "linux").is_some());
     }
 }

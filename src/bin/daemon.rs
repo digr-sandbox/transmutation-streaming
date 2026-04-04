@@ -427,7 +427,8 @@ fn structural_extraction(original_input: &str) -> String {
 async fn handle_execute(State(state): State<Arc<AppState>>, Json(payload): Json<ExecuteRequest>) -> Json<ExecuteResponse> {
     let start_rpc = Instant::now();
     let start_security = Instant::now();
-    let security_result = state.security.evaluate(&payload.command, &payload.tool_name);
+    let platform = std::env::consts::OS;
+    let security_result = state.security.evaluate(&payload.command, &payload.tool_name, platform);
     let security_ms = start_security.elapsed().as_millis();
 
     if let Some(error_msg) = security_result {

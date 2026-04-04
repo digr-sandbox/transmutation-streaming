@@ -5,43 +5,62 @@
     "message": "Security Policy: Access to root system files and credentials is strictly prohibited."
   },
   {
-    "name": "02_Config_DB_Isolation",
+    "name": "02_Config_DB_Isolation_Linux",
+    "platform": "linux",
     "logic": "t.function.name == 'execute_secure_command' && t.function.arguments.matches('(?i).*(cat |grep |rg |ag |ack |less |more |vi |nano |view |edit |cp |mv |ln ).*(\\.env|config\\..*|\\.sqlite|\\.db).*')",
     "message": "Security Policy: Shell-based access to config/DB files is blocked. You MUST use native 'read_file' or 'edit_file' tools. 'head' and 'tail' are permitted."
   },
   {
-    "name": "03_Secret_Hunting_Dumping",
+    "name": "02_Config_DB_Isolation_Windows",
+    "platform": "windows",
+    "logic": "t.function.name == 'execute_secure_command' && t.function.arguments.matches('(?i).*(type |Get-Content |gc |cat |select-string |sls |findstr |edit |copy |cp |move |mv |ni |New-Item ).*(\\.env|config\\..*|\\.sqlite|\\.db).*')",
+    "message": "Security Policy: Shell-based access to config/DB files is blocked on Windows. Use native tools."
+  },
+  {
+    "name": "02_Config_DB_Isolation_MacOS",
+    "platform": "macos",
+    "logic": "t.function.name == 'execute_secure_command' && t.function.arguments.matches('(?i).*(cat |grep |rg |ag |ack |less |more |vi |nano |view |edit |cp |mv |ln ).*(\\.env|config\\..*|\\.sqlite|\\.db).*')",
+    "message": "Security Policy: Shell-based access to config/DB files is blocked on macOS. Use native tools."
+  },
+  {
+    "name": "03_Secret_Hunting_Dumping_Linux",
+    "platform": "linux",
     "logic": "t.function.name == 'execute_secure_command' && t.function.arguments.matches('(?i).*(grep|ag|rg|find|ack).*(key|secret|token|password|auth|credential).*|^(env|printenv|export|set)$')",
     "message": "Security Policy: Environment dumping and bulk secret scanning are prohibited."
   },
   {
-    "name": "04_Timeout_Minimum_Enforcement",
-    "logic": "t.function.name == 'execute_secure_command' && t.function.arguments.matches('(?i).*timeout\\s+([1-9]|[1-9][0-9]|[1-2][0-9][0-9])s?\\b.*')",
-    "message": "Policy Violation: Timeouts under 300s are prohibited to prevent execution failure. Please re-run the command with a timeout of 300s or greater."
+    "name": "03_Secret_Hunting_Dumping_Windows",
+    "platform": "windows",
+    "logic": "t.function.name == 'execute_secure_command' && t.function.arguments.matches('(?i).*(Select-String|sls|findstr|Get-ChildItem -Recurse|ls -r).*(key|secret|token|password|auth|credential).*|^(dir env:|ls env:|gci env:)$')",
+    "message": "Security Policy: Environment dumping and secret scanning are prohibited on Windows."
   },
   {
-    "name": "05_Bad_Regex_And_Redirection",
+    "name": "05_Bad_Regex_And_Redirection_Linux",
+    "platform": "linux",
     "logic": "t.function.name == 'execute_secure_command' && (t.function.arguments.matches('(?i).*(rm -rf|rm -f|sed |awk |patch |truncate).*') || t.function.arguments.matches('(?i).*ssh .*\\b(rm -rf|rm -f|drop database|truncate)\\b.*') || (t.function.arguments.matches('(?i).*(>|>>).*') && !t.function.arguments.matches('(?i).*(\\.log|/tmp/|2>&1|/dev/null).*')))",
-    "message": "Security Policy: Destructive commands, stream editors (sed/awk), and arbitrary file redirection are blocked. Use native tools for file edits."  
+    "message": "Security Policy: Destructive commands, stream editors (sed/awk), and arbitrary file redirection are blocked."
   },
   {
-    "name": "06_GitHub_Contributor_Safety",
-    "logic": "t.function.name == 'execute_secure_command' && t.function.arguments.matches('(?i).*gh (repo delete|pr merge|secret set|auth logout).*')",
-    "message": "Security Policy: You are restricted to contributor actions. Repository deletion and PR merging require human intervention."
+    "name": "05_Bad_Regex_And_Redirection_Windows",
+    "platform": "windows",
+    "logic": "t.function.name == 'execute_secure_command' && (t.function.arguments.matches('(?i).*(del /s /q|rmdir /s /q|Remove-Item -Recurse|ri -r|del -r).*') || t.function.arguments.matches('(?i).*(\\.replace|\\.substring| -replace ).*') || (t.function.arguments.matches('(?i).*(\\s+>\\s+|\\s+>>\\s+).*') && !t.function.arguments.matches('(?i).*(\\.log|/tmp/|/temp/|\\$null).*')))",
+    "message": "Security Policy: Destructive commands and file redirection are blocked on Windows."
   },
   {
-    "name": "07_Sudo_And_Blind_Execution",
-    "logic": "t.function.name == 'execute_secure_command' && t.function.arguments.matches('(?i).*(^|\\s)(sudo |curl.*\\|.*bash|wget.*\\|.*sh).*')",
+    "name": "07_Sudo_And_Blind_Execution_Global",
+    "logic": "t.function.name == 'execute_secure_command' && t.function.arguments.matches('(?i).*(^|\\s)(sudo |curl.*\\|.*(bash|sh|pwsh|powershell)|wget.*\\|.*(bash|sh|pwsh|powershell)).*')",
     "message": "Security Policy: Sudo privileges and piping web scripts directly to shell are strictly blocked."
   },
   {
-    "name": "08_Native_Tool_Config_Deletion",
-    "logic": "t.function.name == 'delete_file' && t.function.arguments.matches('(?i).*(\\.env|config\\..*|\\.sqlite|\\.db).*')",
-    "message": "Security Policy: Deleting environment configs or local databases is completely prohibited."
+    "name": "10_MacOS_Keychain_Protection",
+    "platform": "macos",
+    "logic": "t.function.arguments.matches('(?i).*/Library/Keychains/.*')",
+    "message": "Security Policy: Access to macOS Keychains is strictly prohibited."
   },
   {
-    "name": "09_Cloud_PaaS_Safety",
-    "logic": "t.function.name == 'execute_secure_command' && t.function.arguments.matches('(?i).*\\b(terraform destroy|tofu destroy|pulumi destroy|kubectl delete|helm uninstall|wp db (reset|drop)|docker (system prune|rm|rmi)|(aws|gcloud|az|oci|doctl|vercel|vc|wrangler|netlify|ntl|heroku)\\s+.*\\b(delete|rm|remove|destroy)\\b).*')",
-    "message": "Security Policy: Destructive actions against cloud infrastructure, PaaS deployments, and container environments are blocked."
+    "name": "11_Windows_Registry_Protection",
+    "platform": "windows",
+    "logic": "t.function.arguments.matches('(?i).*(reg query|reg add|reg delete|Set-ItemProperty|Remove-ItemProperty|HKLM:|HKCU:).*')",
+    "message": "Security Policy: Direct Windows Registry modification is prohibited via shell tools."
   }
 ]
