@@ -124,9 +124,6 @@ You can pipe infinite shell output directly into the transmuter to safely compre
 ```bash
 # Compress massive shell output for an agent
 cat massive_build.log | transmutation convert - --optimize-llm > compressed_context.md
-
-# Safely proxy unknown binary formats (auto-routes to correct engine)
-cat unknown_file.mp4 | transmutation convert - --output transcript.md
 ```
 
 **Key Benefits for Agents:**
@@ -159,7 +156,6 @@ Transmutation also functions as a high-performance document converter:
 | **HTML/XML** | Markdown, JSON | ✅ Production | TOON Structural Minification |
 | **TXT/CSV** | Markdown, JSON | ✅ Production | OOM-Safe Buffering |
 | **Images** | Markdown (OCR) | ✅ Production | Tesseract Integration |
-| **Audio/Video**| Markdown (Transcription) | ✅ Production | Whisper Integration |
 
 ## 🚀 Installation
 
@@ -179,9 +175,9 @@ cargo install --path . --features "cli"
 ```
 
 ### macOS
-Ensure Tesseract and FFmpeg are installed via Brew:
+Ensure Tesseract is installed via Brew:
 ```bash
-brew install tesseract ffmpeg
+brew install tesseract
 cargo install --path . --features "cli"
 ```
 

@@ -4,14 +4,14 @@
 **Transmutation** is a high-performance document conversion engine written in **pure Rust**. It is designed as a lightweight, extremely fast (up to 98x faster than Docling) alternative for transforming various file formats into LLM-friendly outputs (Markdown, JSON, Images).
 
 - **Core Mission**: High-speed document ingestion for AI/LLM embeddings and RAG systems.
-- **Key Features**: 27+ formats supported, zero Python dependencies, streaming architecture (constant memory footprint), and optimized for Agentic IDE pipelines.
-- **Main Technologies**: Rust 2024 (Nightly), Tokio (Async), Serde, Tesseract (OCR), Whisper (Audio), FFmpeg (Video).
+- **Key Features**: 22+ formats supported, zero Python dependencies, streaming architecture (constant memory footprint), and optimized for Agentic IDE pipelines.
+- **Main Technologies**: Rust 2024 (Nightly), Tokio (Async), Serde, Tesseract (OCR).
 
 ## Building and Running
 
 ### Prerequisites
 - **Rust Toolchain**: Nightly 1.85+ (`rustup toolchain install nightly`)
-- **System Dependencies**: Some features require external tools (Tesseract, Poppler, LibreOffice, FFmpeg, Whisper). Use scripts in `install/` to set them up.
+- **System Dependencies**: Some features require external tools (Tesseract, Poppler, LibreOffice). Use scripts in `install/` to set them up.
 
 ### Key Commands
 - **Build**: `cargo build --release` (standard) or `cargo build --features full` (all features).

@@ -31,20 +31,6 @@ pub enum FileFormat {
     Gif,
     Webp,
 
-    // Audio formats
-    Mp3,
-    Wav,
-    M4a,
-    Flac,
-    Ogg,
-
-    // Video formats
-    Mp4,
-    Avi,
-    Mkv,
-    Mov,
-    Webm,
-
     // Archive formats
     Zip,
     Tar,
@@ -84,22 +70,6 @@ impl FileFormat {
         )
     }
 
-    /// Check if format is audio
-    pub fn is_audio(&self) -> bool {
-        matches!(
-            self,
-            Self::Mp3 | Self::Wav | Self::M4a | Self::Flac | Self::Ogg
-        )
-    }
-
-    /// Check if format is video
-    pub fn is_video(&self) -> bool {
-        matches!(
-            self,
-            Self::Mp4 | Self::Avi | Self::Mkv | Self::Mov | Self::Webm
-        )
-    }
-
     /// Check if format is an archive
     pub fn is_archive(&self) -> bool {
         matches!(
@@ -129,16 +99,6 @@ impl FileFormat {
             Self::Bmp => "bmp",
             Self::Gif => "gif",
             Self::Webp => "webp",
-            Self::Mp3 => "mp3",
-            Self::Wav => "wav",
-            Self::M4a => "m4a",
-            Self::Flac => "flac",
-            Self::Ogg => "ogg",
-            Self::Mp4 => "mp4",
-            Self::Avi => "avi",
-            Self::Mkv => "mkv",
-            Self::Mov => "mov",
-            Self::Webm => "webm",
             Self::Zip => "zip",
             Self::Tar => "tar",
             Self::TarGz => "tar.gz",
@@ -470,8 +430,6 @@ mod tests {
     fn test_file_format_categories() {
         assert!(FileFormat::Pdf.is_document());
         assert!(FileFormat::Png.is_image());
-        assert!(FileFormat::Mp3.is_audio());
-        assert!(FileFormat::Mp4.is_video());
         assert!(FileFormat::Zip.is_archive());
     }
 

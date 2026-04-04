@@ -50,18 +50,8 @@ Write-Host "[4/7] Installing LibreOffice (Office formats)..." -ForegroundColor Y
 choco install libreoffice -y
 
 # OCR support
-Write-Host "[5/7] Installing Tesseract (OCR for images)..." -ForegroundColor Yellow
+Write-Host "[5/5] Installing Tesseract (OCR for images)..." -ForegroundColor Yellow
 choco install tesseract -y
-
-# Audio/Video processing
-Write-Host "[6/7] Installing FFmpeg (Video → Audio extraction)..." -ForegroundColor Yellow
-choco install ffmpeg -y
-
-# Audio/Video transcription
-Write-Host "[7/7] Installing Python + Whisper (Audio/Video → Text)..." -ForegroundColor Yellow
-choco install python3 -y
-pip install --upgrade pip
-pip install openai-whisper
 
 Write-Host ""
 Write-Host "✅ All dependencies installed!" -ForegroundColor Green
@@ -72,8 +62,6 @@ Write-Host "  - CMake & Git"
 Write-Host "  - pdftoppm.exe (poppler)"
 Write-Host "  - soffice.exe (LibreOffice)"
 Write-Host "  - tesseract.exe (OCR)"
-Write-Host "  - ffmpeg.exe (Audio/Video)"
-Write-Host "  - whisper.exe (Transcription)"
 Write-Host ""
 Write-Host "⚠️  IMPORTANT: Restart your PowerShell terminal!" -ForegroundColor Yellow
 Write-Host "   New PATH entries need to be loaded."
@@ -82,7 +70,5 @@ Write-Host "🚀 You can now run:" -ForegroundColor Green
 Write-Host "   transmutation convert document.pdf --format png"
 Write-Host "   transmutation convert document.docx -o output.md"
 Write-Host "   transmutation convert image.jpg -o ocr.md        # OCR"
-Write-Host "   transmutation convert audio.mp3 -o transcript.md # Whisper"
-Write-Host "   transmutation convert video.mp4 -o transcript.md # FFmpeg + Whisper"
 Write-Host ""
 

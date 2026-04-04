@@ -34,18 +34,8 @@ echo "[3/6] Installing LibreOffice (Office formats)..."
 brew install --cask libreoffice
 
 # OCR support
-echo "[4/6] Installing Tesseract (OCR for images)..."
+echo "[4/4] Installing Tesseract (OCR for images)..."
 brew install tesseract tesseract-lang
-
-# Audio/Video processing
-echo "[5/6] Installing FFmpeg (Video → Audio extraction)..."
-brew install ffmpeg
-
-# Audio/Video transcription
-echo "[6/6] Installing Whisper (Audio/Video → Text transcription)..."
-brew install pipx
-pipx install openai-whisper
-pipx ensurepath
 
 echo ""
 echo "✅ All dependencies installed!"
@@ -55,18 +45,10 @@ echo "  - Xcode tools: $(xcode-select -p)"
 echo "  - pdftoppm: $(pdftoppm -v 2>&1 | head -1)"
 echo "  - LibreOffice: /Applications/LibreOffice.app"
 echo "  - Tesseract: $(tesseract --version | head -1)"
-echo "  - FFmpeg: $(ffmpeg -version | head -1)"
-echo "  - Whisper: $(whisper --help 2>&1 | head -1 || echo 'installed (check PATH)')"
-echo ""
-echo "⚠️  IMPORTANT: Ensure Whisper is in PATH:"
-echo "   pipx ensurepath"
-echo "   source ~/.zshrc  # or ~/.bash_profile"
 echo ""
 echo "🚀 You can now run:"
 echo "   transmutation convert document.pdf --format png"
 echo "   transmutation convert document.docx -o output.md"
 echo "   transmutation convert image.jpg -o ocr.md        # OCR"
-echo "   transmutation convert audio.mp3 -o transcript.md # Whisper"
-echo "   transmutation convert video.mp4 -o transcript.md # FFmpeg + Whisper"
 echo ""
 

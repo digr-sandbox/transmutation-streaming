@@ -111,21 +111,6 @@ if exist tesseract-installer.exe (
 )
 
 echo.
-echo [7/6] FFmpeg
-echo   Downloading FFmpeg...
-set FFMPEG_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip
-curl -L -o ffmpeg.zip "%FFMPEG_URL%"
-if exist ffmpeg.zip (
-    echo   Extracting FFmpeg...
-    powershell -Command "Expand-Archive -Path ffmpeg.zip -DestinationPath 'C:\Program Files\ffmpeg\' -Force"
-    echo   Adding to PATH...
-    setx /M PATH "%PATH%;C:\Program Files\ffmpeg\bin"
-) else (
-    echo   ⚠️ Download failed, please install manually from:
-    echo   https://www.ffmpeg.org/download.html
-)
-
-echo.
 echo.
 echo ╔════════════════════════════════════════╗
 echo ║  ✅ Installation Complete!            ║
@@ -138,7 +123,6 @@ echo   ✓ Git
 echo   ✓ Poppler (pdftoppm)
 echo   ✓ LibreOffice
 echo   ✓ Tesseract OCR
-echo   ✓ FFmpeg
 echo.
 echo ⚠️  IMPORTANT: 
 echo   1. RESTART your computer to apply PATH changes

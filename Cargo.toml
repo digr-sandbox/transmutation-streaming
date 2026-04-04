@@ -4,12 +4,12 @@ version = "0.3.2"
 edition = "2024"
 authors = ["HiveLLM Team <team@hivellm.org>"]
 license = "MIT"
-description = "High-performance document conversion engine for AI/LLM embeddings - 27 formats supported"
+description = "High-performance document conversion engine for AI/LLM embeddings - 22 formats supported"
 repository = "https://github.com/hivellm/transmutation"
 homepage = "https://hivellm.org/transmutation"
 documentation = "https://docs.rs/transmutation"
 keywords = ["document", "conversion", "pdf", "llm", "embedding"]
-categories = ["parser-implementations", "text-processing", "multimedia"]
+categories = ["parser-implementations", "text-processing"]
 readme = "README.md"
 rust-version = "1.85"
 exclude = [
@@ -19,8 +19,6 @@ exclude = [
     "build_*",
     "libs/",
     "*.pdf",
-    "*.mp3",
-    "*.mp4",
     ".github/",
 ]
 
@@ -149,7 +147,6 @@ notify = "8.2.0"
 tree-sitter = "0.26.8"
 tree-sitter-rust = "0.24.2"
 tree-sitter-typescript = "0.23.2"
-tree-sitter-python = "0.25.0"
 
 # Note: External integrations removed (cache, HTTP, metrics)
 # Transmutation is a library/CLI - external features are handled by HiveLLM Vectorizer
@@ -176,8 +173,6 @@ tesseract = ["dep:tesseract", "dep:leptess"]
 pdf-to-image = ["dep:pdfium-render"]  # PDF rendering to images per page (optional)
 office = ["docx-rs", "umya-spreadsheet"]  # Office formats (DOCX, XLSX, PPTX)
 image-ocr = ["tesseract"]
-audio = []  # Audio transcription (requires external whisper CLI)
-video = []  # Video transcription (requires external ffmpeg + whisper CLI)
 archives-extended = ["tar", "flate2", "sevenz-rust"]  # Extended archive support (TAR, GZ, 7Z)
 
 # Advanced layout analysis (C++ FFI to docling-parse + ML models)
@@ -191,8 +186,6 @@ full = [
     "pdf-to-image",
     "office",
     "image-ocr",
-    "audio",
-    "video",
     "archives-extended",
     "cli",
 ]
@@ -265,7 +258,7 @@ section = "text"
 priority = "optional"
 extended-description = """\
 Transmutation is a high-performance document conversion engine for AI/LLM embeddings. \
-Supports 27+ formats including PDF, Office docs, images, audio, and video. \
+Supports 22+ formats including PDF, Office docs, and images. \
 Built in Rust for maximum performance and safety.\
 """
 assets = [

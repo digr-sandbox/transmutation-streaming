@@ -59,19 +59,8 @@ echo [4/7] Installing LibreOffice (Office formats)...
 winget install --id TheDocumentFoundation.LibreOffice --silent --accept-package-agreements --accept-source-agreements
 
 echo.
-echo [5/7] Installing Tesseract (OCR)...
+echo [5/5] Installing Tesseract (OCR)...
 winget install --id UB-Mannheim.TesseractOCR --silent --accept-package-agreements --accept-source-agreements
-
-echo.
-echo [6/7] Installing FFmpeg (Video → Audio extraction)...
-winget install --id Gyan.FFmpeg --silent --accept-package-agreements --accept-source-agreements
-
-echo.
-echo [7/7] Installing Python + Whisper (Audio/Video → Text)...
-winget install --id Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements
-timeout /t 3 /nobreak >nul
-pip install --upgrade pip
-pip install openai-whisper
 
 echo.
 echo ╔════════════════════════════════════════╗
@@ -84,8 +73,6 @@ echo   ✓ CMake ^& Git
 echo   ⚠️ Poppler (manual installation required)
 echo   ✓ LibreOffice
 echo   ✓ Tesseract OCR
-echo   ✓ FFmpeg
-echo   ✓ Python + Whisper
 echo.
 echo ⚠️  IMPORTANT: Restart your terminal/PowerShell to apply PATH changes
 echo.
@@ -93,8 +80,6 @@ echo 🚀 After restart, you can run:
 echo    transmutation convert document.pdf --format png
 echo    transmutation convert document.docx -o output.md
 echo    transmutation convert image.jpg -o ocr.md
-echo    transmutation convert audio.mp3 -o transcript.md
-echo    transmutation convert video.mp4 -o transcript.md
 echo.
 echo 📝 For Poppler installation, see: transmutation\install\README.md
 echo.
