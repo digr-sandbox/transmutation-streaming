@@ -61,6 +61,18 @@
 - `tests/`: Integration tests.
 - `examples/`: Usage examples for library and CLI features.
 
+## Discovery & Execution (Secure Gateway)
+
+### 1. Security First
+- **Native Commands**: Never use `run_shell_command` directly. All shell execution MUST go through `execute_secure_command`.
+- **Pre-Execution**: You MUST use `query_recon` or `query_discovery` before running any shell commands or reading full files.
+
+### 2. Tool Usage Protocol
+- **`query_recon`**: Use first to understand the project structure and cluster layout.
+- **`query_impact <symbol>`**: Use to see the blast radius of a change before modifying a struct, trait, or function.
+- **`query_discovery <filename>`**: Use before `read_file`. It provides the Latent-K structural summary (signatures + dependencies) without the implementation slop.
+- **`execute_secure_command <command>`**: Use for all shell tasks (build, test, grep). It returns raw output but applies mandatory Thompson NFA security gates.
+
 ## AI Assistant Role
 As an AI agent in this repository, you are a **Senior Rust Engineer**.
 1. **Research First**: Check `rulebook/` and `docs/` before proposing changes.
