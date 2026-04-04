@@ -52,10 +52,23 @@ Every output is automatically routed to the most semantic engine:
 2.  **Latent-K Skeleton**: Used for source code. It uses Tree-sitter to extract dependencies and signatures while hiding implementation details.
 3.  **Statistical Squeezer**: Used for everything else (logs, terminal output). It uses IDF scoring and local entropy to prune noise.
 
-## 4. Audit & Provenance System
-Every transformation is non-destructive. The original, raw output is saved to a local **SQLite Audit Database** (`~/.transmutation/audit.db`).
-*   Agents receive a **Provenance Header** with a unique `request_id`.
-*   This enables the `get_provenance` tool, allowing agents to "look behind the curtain" if they suspect a hallucination or need precise implementation details.
+## 4. Zero-Trust Auditing & Provenance
+Every interaction with the gateway is recorded in a local SQLite audit database (`~/.transmutation/audit.db`) to ensure full transparency and recoverability.
+
+### What is Logged?
+1. **Tool Calls**: Every call to `query_recon`, `query_discovery`, `query_impact`, and `execute_secure_command` is logged.
+2. **Metadata**: Request ID, Timestamp, OS Platform, Security Latency, Execution Time, and Compaction Ratios.
+3. **Payloads**: The system logs both the **Raw Input/Command** and the **Final Transmuted Output**.
+
+### Automatic Log Rotation
+To maintain a minimal system footprint, Transmutation enforces a strict **1GB Storage Budget**:
+*   **Rotation Trigger**: When the SQLite database exceeds 1GB.
+*   **Policy**: The system automatically purges the **oldest 500 records** (both metadata and content) and runs a `VACUUM` to reclaim disk space.
+
+### Hallucination Recovery
+Every crushed response includes a **Provenance Header** with a unique `request_id`.
+*   Agents can call **`get_provenance(id)`** to retrieve the original, uncrushed ground truth.
+*   This creates a "Trust but Verify" loop where the agent uses crushed context for reasoning but can verify precise details if a conflict is detected.
 
 ## 5. Deployment Specs
 *   **Language**: 100% Pure Rust (Safe/Concurrent).

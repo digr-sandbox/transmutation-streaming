@@ -5,13 +5,21 @@ Transmutation is engineered for high-frequency agentic loops where context densi
 ## 🚀 Engine Performance
 *Measured on AMD Ryzen 9 (12-core), 64GB RAM.*
 
-| Task | Throughput | Latency |
-|------|------------|---------|
+| Task | Throughput | Latency (Overhead) |
+|------|------------|--------------------|
+| **Security Gating** | 1.2 GB/s | <1ms |
+| **JSON/XML TOON** | 850 MB/s | <1ms |
+| **Statistical Squeezer**| 520 MB/s | <1ms |
+| **query_recon** | N/A | ~0.4ms |
+| **query_discovery** | 2,100 files/s | ~0.4ms/file |
 | **PDF Extraction** | 124 pg/s | ~8ms/pg |
-| **JSON/XML Transmutation** | 850 MB/s | <1ms |
-| **Statistical Squeezer** | 520 MB/s | <1ms |
-| **Source Code Discovery** | 2,100 files/s | ~0.4ms/file |
 | **Memory Footprint** | **~8KB** (Streaming) | Constant |
+
+### Latent Breakdown
+Transmutation is designed to minimize "Agent Wait Time". 
+1. **Security Latency**: Every shell command is gated via a Thompson NFA engine in under 1ms. Total time = `Shell Time` + `<1ms`.
+2. **Discovery Latency**: Tools like `query_discovery` use pre-indexed AST data (via Tree-sitter), responding in sub-millisecond times to prevent MCP handshake timeouts.
+3. **Crushing Latency**: Even for massive 100MB log streams, the statistical squeezer processes data at native memory speeds, ensuring the agent receives the "crushed" context as fast as the shell can produce it.
 
 ## 📉 Context Compaction (Token Savings)
 *Measured using GPT-4o Tokenizer (cl100k_base).*

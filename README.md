@@ -14,18 +14,22 @@ Modern AI agents often "over-read" terminal output, wasting thousands of tokens 
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
-Transmutation is **Zero-Python** and **Zero-LibreOffice**. You only need Tesseract for OCR.
-*   **Windows**: `.\install\install-deps-windows.ps1`
-*   **Linux**: `./install/install-deps-linux.sh`
-*   **macOS**: `./install/install-deps-macos.sh`
+### 1. Download or Build
+You can download pre-built binaries for your platform:
+*   **Windows**: [`transmutation-x64.msi`](https://github.com/hivellm/transmutation/releases/latest) (Installer)
+*   **Linux**: [`transmutation-x86_64-musl`](https://github.com/hivellm/transmutation/releases/latest) (Static Binary)
+*   **macOS**: [`transmutation-aarch64-apple-darwin`](https://github.com/hivellm/transmutation/releases/latest) (Apple Silicon)
 
-### 2. Build the Gateway
+#### Building Your Own Gateway
+If you prefer to build from source, run this single command (requires Rust):
 ```bash
-cargo build --release --features cli
+# Clone and build all features (Office, OCR, CLI)
+git clone https://github.com/hivellm/transmutation.git && cd transmutation
+cargo build --release --features full
 ```
+*(Transmutation is **Zero-Python** and **Zero-LibreOffice**. Only Tesseract is required for the optional `image-ocr` feature).*
 
-### 3. Connect your Agent (MCP)
+### 2. Connect your Agent (MCP)
 Add Transmutation to your `claude.json` or `mcp.json`:
 ```json
 {

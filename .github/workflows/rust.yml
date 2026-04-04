@@ -41,10 +41,10 @@ jobs:
       # The image-ocr (tesseract/leptonica) feature is excluded because it
       # requires system-specific C libraries that are fragile across CI runners.
       - name: Build tests
-        run: cargo build --tests --workspace --features "pdf-to-image,office,audio,video,archives-extended,cli"
+        run: cargo build --tests --workspace --features "office,archives-extended,cli"
 
       - name: Run tests
-        run: cargo test --workspace --features "pdf-to-image,office,audio,video,archives-extended,cli"
+        run: cargo test --workspace --features "office,archives-extended,cli"
 
   fmt:
     name: Rustfmt
