@@ -11,7 +11,7 @@ pub mod exporters;
 use std::path::Path;
 
 pub use document_structure::DocumentStructure;
-pub use exporters::{ChunkingExporter, Exporter, ImageExporter, JsonExporter, MarkdownExporter};
+pub use exporters::{ChunkingExporter, Exporter, JsonExporter, MarkdownExporter};
 
 use crate::error::Result;
 
@@ -27,7 +27,6 @@ use crate::error::Result;
 /// // Export to multiple formats from same document
 /// let md = MarkdownExporter::new().export(&doc)?;
 /// let json = JsonExporter::new().export(&doc)?;
-/// let images = ImageExporter::new().export_pages(&doc)?;
 /// let chunks = ChunkingExporter::new(512).export(&doc)?;
 /// ```
 #[derive(Debug)]
