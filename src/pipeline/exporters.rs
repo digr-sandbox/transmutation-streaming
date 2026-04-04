@@ -78,50 +78,6 @@ impl Exporter for JsonExporter {
     }
 }
 
-/// Image exporter (renders pages to images)
-#[derive(Debug)]
-pub struct ImageExporter {
-    dpi: u32,
-    format: ImageFormat,
-    quality: u8,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum ImageFormat {
-    Png,
-    Jpeg,
-    Webp,
-}
-
-impl ImageExporter {
-    pub fn new() -> Self {
-        Self {
-            dpi: 150,
-            format: ImageFormat::Png,
-            quality: 90,
-        }
-    }
-
-    pub fn with_dpi(mut self, dpi: u32) -> Self {
-        self.dpi = dpi;
-        self
-    }
-
-    pub fn with_format(mut self, format: ImageFormat) -> Self {
-        self.format = format;
-        self
-    }
-}
-
-impl Exporter for ImageExporter {
-    type Output = Vec<Vec<u8>>; // One image per page
-
-    fn export(&self, _doc: &DocumentStructure) -> Result<Self::Output> {
-        // TODO: Implement PDF rendering to images
-        todo!("Image export not yet implemented - requires pdfium-render integration")
-    }
-}
-
 /// Chunking exporter (splits document into chunks for embeddings)
 #[derive(Debug)]
 pub struct ChunkingExporter {
@@ -179,8 +135,3 @@ impl Default for JsonExporter {
     }
 }
 
-impl Default for ImageExporter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
