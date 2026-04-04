@@ -18,14 +18,11 @@ Thumbs.db
 # Build artifacts
 build_*/
 cpp/build*/
-libs/*.so
-libs/*.dll
-libs/*.dylib
-libs/*.lib
 *.o
 *.a
 
 # Release artifacts
+libs/
 *.tar.gz
 *.zip
 *.deb

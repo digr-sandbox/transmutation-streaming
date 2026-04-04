@@ -1,0 +1,30 @@
+# Dockerfile for building Transmutation FFI libraries (ARM64)
+FROM --platform=linux/arm64 ubuntu:24.04 AS builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    pkg-config \
+    libssl-dev \
+    zlib1g-dev \
+    libtesseract-dev \
+    libleptonica-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy source code
+COPY . .
+
+# Ensure scripts are executable
+RUN chmod +x scripts/*.sh
+
+# Run the build script
+RUN ./scripts/build_cpp.sh
+
+# Extraction stage
+FROM scratch
+COPY --from=builder /app/libs/ /output/

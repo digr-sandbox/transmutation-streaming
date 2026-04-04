@@ -11,6 +11,24 @@ Modern AI agents often "over-read" terminal output, wasting thousands of tokens 
 2.  **Context Density**: Crushing 100MB of log data into <10KB of high-signal Markdown using statistical and structural algorithms.
 3.  **Zero-Trust Auditing**: Maintaining a persistent SQLite audit trail of every transformation for full provenance recovery.
 
+## 🚀 Getting Started
+
+### 📦 Quick Build & Installation
+
+Transmutation provides unified build scripts for all major platforms. Ensure you have the [prerequisites](#-installation) installed before building.
+
+| Platform | Build Script | Output / Binaries |
+|----------|--------------|-------------------|
+| **Windows** | [`.\scripts\build-msi.ps1`](scripts/build-msi.ps1) | `target/wix/transmutation-x64.msi` |
+| **Linux** | [`./scripts/build-libs-all.sh`](scripts/build-libs-all.sh) | [`libs/libdocling-ffi-linux_x86.so`](libs/) |
+| **macOS** | [`./scripts/build-all.sh`](scripts/build-all.sh) | [`libs/libdocling-ffi-macos_ARM.dylib`](libs/) |
+
+**Standard Rust Build:**
+```bash
+# Build for all platforms (CLI features)
+cargo build --release --features cli
+```
+
 ## 🛡️ Shell Security: Thompson NFA Firewall
 
 Transmutation implements a Thompson NFA-based security firewall that evaluates commands in real-time.
