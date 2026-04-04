@@ -1,6 +1,5 @@
 #!/bin/bash
-# Install Transmutation dependencies on macOS
-
+# Install Transmutation dependencies on macOS - Unix LF enforced
 set -e
 
 echo "╔════════════════════════════════════════╗"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build docling FFI library for Linux/Mac
+# Build docling FFI library for Linux/Mac (Unix line endings enforced)
 set -e
 
 echo -e "\033[1;36mBuilding docling FFI library...\033[0m"

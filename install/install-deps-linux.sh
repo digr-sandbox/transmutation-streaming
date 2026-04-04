@@ -1,6 +1,5 @@
 #!/bin/bash
-# Install Transmutation dependencies on Linux (Debian/Ubuntu)
-
+# Install Transmutation dependencies on Linux (Debian/Ubuntu) - Unix LF enforced
 set -e
 
 echo "╔════════════════════════════════════════╗"

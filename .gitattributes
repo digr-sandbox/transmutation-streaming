@@ -1,0 +1,22 @@
+# Set default behavior to handle line endings.
+* text=auto
+
+# Ensure shell scripts always have LF line endings.
+*.sh text eol=lf
+*.bash text eol=lf
+install/install-deps-linux text eol=lf
+install/install-deps-macos text eol=lf
+
+# Binary files should not be modified.
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary
+*.so binary
+*.dll binary
+*.dylib binary
+*.lib binary
+*.onnx binary
+*.pt binary
+*.pth binary
+*.safetensors binary
