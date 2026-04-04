@@ -31,7 +31,7 @@
   {
     "name": "03_Secret_Hunting_Dumping_Windows",
     "platform": "windows",
-    "logic": "t.function.name == 'execute_secure_command' && t.function.arguments.matches('(?i).*(Select-String|sls|findstr|Get-ChildItem -Recurse|ls -r).*(key|secret|token|password|auth|credential).*|^(dir env:|ls env:|gci env:)$')",
+    "logic": "t.function.name == 'execute_secure_command' && t.function.arguments.matches('(?i).*(Select-String|sls|findstr|Get-ChildItem -Recurse|ls -r).*(key|secret|token|password|auth|credential).*|.*(dir|ls|gci|Get-ChildItem)\\s+env:.*')",
     "message": "Security Policy: Environment dumping and secret scanning are prohibited on Windows."
   },
   {
