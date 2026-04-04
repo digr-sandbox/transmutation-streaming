@@ -236,7 +236,7 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
-    let log_dir = dirs::home_dir().map(|p| p.join(".transmutation").join("logs")).unwrap_or_else(|| PathBuf::from("."));
+    let log_dir = dirs::home_dir().map(|p| p.join(".transmutation")).unwrap_or_else(|| PathBuf::from("."));
     std::fs::create_dir_all(&log_dir).ok();
     let file_appender = tracing_appender::rolling::daily(log_dir, "daemon.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
@@ -299,6 +299,7 @@ fn structural_extraction(original_input: &str) -> String {
     let mut lines = Vec::new();
     let mut in_import = false;
     let mut depth = 0;
+    let mut in_structural = false;
 
     let boredom_table: HashSet<&str> = [
         "if", "else", "let", "var", "const", "return", "public", "private", "protected", 
@@ -313,8 +314,9 @@ fn structural_extraction(original_input: &str) -> String {
         let trimmed = line.trim();
         if trimmed.is_empty() { continue; }
         
-        // --- PASS 0: COMMENT & NOISE EVICTION ---
-        if (trimmed.starts_with("//") || trimmed.starts_with('#') || trimmed.starts_with("/*") || trimmed.starts_with('*')) 
+        // --- PASS 0: ABSOLUTE COMMENT EVICTION ---
+        if (trimmed.starts_with("//") || trimmed.starts_with('#') || trimmed.starts_with("/*") || 
+            trimmed.starts_with('*') || trimmed.starts_with('%') || trimmed.starts_with("--")) 
            && !trimmed.contains('@') && !trimmed.contains("#[") {
             continue;
         }
@@ -323,15 +325,16 @@ fn structural_extraction(original_input: &str) -> String {
         }
 
         // --- PASS 1: IMPORT ANCHORING ---
-        if trimmed.starts_with("import ") || trimmed.starts_with("use ") || trimmed.starts_with("#include") || trimmed.starts_with("package ") {
+        if trimmed.starts_with("import ") || trimmed.starts_with("use ") || trimmed.starts_with("#include") || 
+           trimmed.starts_with("package ") || trimmed.starts_with("-module") || trimmed.starts_with("require") {
             if trimmed.contains('{') && !trimmed.contains('}') { in_import = true; }
             lines.push(line.to_string());
-            if trimmed.contains('}') || trimmed.contains(';') { in_import = false; }
+            if trimmed.contains('}') || trimmed.contains(';') || trimmed.ends_with('.') { in_import = false; }
             continue;
         }
         if in_import {
             lines.push(line.to_string());
-            if trimmed.contains('}') || trimmed.contains(';') { in_import = false; }
+            if trimmed.contains('}') || trimmed.contains(';') || trimmed.ends_with('.') { in_import = false; }
             continue;
         }
 
@@ -340,24 +343,36 @@ fn structural_extraction(original_input: &str) -> String {
         let close_braces = trimmed.chars().filter(|&c| c == '}').count();
         let was_at_root = depth == 0;
         
+        // Update depth tracking based on block type
+        let is_structural = trimmed.contains("struct") || trimmed.contains("typedef") || 
+                           trimmed.contains("interface") || trimmed.contains("enum") ||
+                           trimmed.to_uppercase().contains("TABLE") ||
+                           trimmed.starts_with("type ") || trimmed.starts_with("query ") || 
+                           trimmed.starts_with("mutation ") || trimmed.starts_with("BEGIN");
+        
+        if is_structural { in_structural = true; }
+        
         // --- PASS 3: WEIGHTED SIGNAL SCORING ---
         let mut score = 0;
 
         // Meta-Gravity
-        if trimmed.starts_with('@') || trimmed.starts_with("#[") || trimmed.starts_with("#!") {
+        if trimmed.starts_with('@') || trimmed.starts_with("#[") || trimmed.starts_with("#!") || 
+           trimmed.starts_with("<?php") || trimmed.starts_with("-module") {
             score += 30;
         }
         
         // Structural Gravity (Signatures)
         if trimmed.ends_with('{') || trimmed.ends_with(':') || trimmed.ends_with('[') || 
-           trimmed.contains("struct ") || trimmed.contains("typedef ") || trimmed.contains("interface ") || (trimmed.contains("func ") && !trimmed.contains('}')) {
+           is_structural || (trimmed.contains("func ") && !trimmed.contains('}')) || 
+           trimmed.contains("::") || trimmed.contains("->") {
             score += 20;
         }
 
         // Data & Protocol Gravity
         if trimmed.starts_with('+') || trimmed.starts_with('-') || trimmed.starts_with('>') || 
            trimmed.to_uppercase().contains("INSERT ") || trimmed.to_uppercase().contains("SELECT ") || 
-           trimmed.to_uppercase().contains("UPDATE ") || trimmed.to_uppercase().contains("CREATE TABLE") {
+           trimmed.to_uppercase().contains("UPDATE ") || trimmed.to_uppercase().contains("PRIMARY KEY") ||
+           trimmed.to_uppercase().contains("BEGIN") || trimmed.to_uppercase().contains("COMMIT") {
             score += 20;
         }
 
@@ -370,7 +385,8 @@ fn structural_extraction(original_input: &str) -> String {
 
         // Relational Gravity (Chains, Pointers, Keys, Refs)
         if trimmed.contains("->") || trimmed.contains('*') || trimmed.contains('&') ||
-           (trimmed.contains('.') && (trimmed.contains('(') || trimmed.contains('['))) {
+           (trimmed.contains('.') && (trimmed.contains('(') || trimmed.contains('['))) ||
+           (trimmed.contains(':') && !trimmed.contains('{')) {
             score += 10;
         }
 
@@ -380,7 +396,7 @@ fn structural_extraction(original_input: &str) -> String {
                 if token.is_empty() || boredom_table.contains(token.to_lowercase().as_str()) { return false; }
                 let has_upper = token.chars().any(|c| c.is_uppercase());
                 let has_lower = token.chars().any(|c| c.is_lowercase());
-                token.len() > 3 && (has_upper && has_lower || token.contains('_') || token.ends_with('*'))
+                token.len() > 2 && (has_upper && has_lower || token.contains('_') || token.ends_with('*') || token.chars().all(|c| c.is_uppercase()))
             });
         
         if has_high_signal {
@@ -388,24 +404,22 @@ fn structural_extraction(original_input: &str) -> String {
         }
 
         // --- PASS 4: TIERED PRESERVATION ---
-        // Threshold 1 for root and structural definitions (structs/typedefs)
+        // Threshold 1 for root and structural definitions (schemas/interfaces)
         // Threshold 10 for implementation bodies (sweet spot for C/TS logic)
-        let is_def_block = trimmed.contains("struct") || trimmed.contains("typedef") || trimmed.contains("interface") || trimmed.contains("enum");
-        let threshold = if was_at_root || is_def_block { 1 } else { 10 };
+        let threshold = if was_at_root || in_structural { 1 } else { 10 };
 
         if score >= threshold {
-            // Never collapse signatures that have parameters (parentheses)
-            let is_signature_line = trimmed.contains('(') && trimmed.contains(')');
-            if was_at_root && trimmed.ends_with('{') && !is_signature_line {
+            // Never collapse signatures that have parameters (parentheses) or schema fields (colons)
+            let is_complex_line = trimmed.contains('(') || (trimmed.contains(':') && !trimmed.contains('{'));
+            if was_at_root && trimmed.ends_with('{') && !is_complex_line && !is_structural {
                 lines.push(format!("{} ... }}", line.trim_end_matches('{').trim_end()));
             } else {
                 lines.push(line.to_string());
             }
         }
-        }
 
         depth = depth + open_braces as i32 - close_braces as i32;
-        if depth < 0 { depth = 0; }
+        if depth <= 0 { depth = 0; in_structural = false; }
     }
     lines.join("\n")
 }
