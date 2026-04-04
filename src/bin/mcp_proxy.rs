@@ -3,11 +3,12 @@
 //! Handles JSON-RPC over stdio and forwards to the persistent Transmutation Daemon.
 //! Includes self-healing lifecycle management (auto-spawning the daemon).
 
-use serde_json::{json, Value};
 use std::time::{Duration, Instant};
+
+use reqwest::Client;
+use serde_json::{Value, json};
 use sysinfo::System;
 use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader};
-use reqwest::Client;
 
 const DAEMON_URL: &str = "http://127.0.0.1:48192";
 const DAEMON_BIN: &str = "daemon";
@@ -19,10 +20,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|p| p.join(".transmutation").join("logs"))
         .unwrap_or_else(|| std::path::PathBuf::from("."));
     std::fs::create_dir_all(&log_dir).ok();
-    
+
     let file_appender = tracing_appender::rolling::daily(log_dir, "mcp_proxy.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-    
+
     tracing_subscriber::fmt()
         .with_writer(non_blocking)
         .with_target(false)
@@ -54,7 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         let method = req["method"].as_str().unwrap_or("");
-        
+
         let id = match req.get("id") {
             Some(v) if !v.is_null() => v.clone(),
             _ => {
@@ -81,7 +82,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "ping" => json!({ "jsonrpc": "2.0", "id": id, "result": {} }),
             "prompts/list" => json!({ "jsonrpc": "2.0", "id": id, "result": { "prompts": [] } }),
-            "resources/list" => json!({ "jsonrpc": "2.0", "id": id, "result": { "resources": [] } }),
+            "resources/list" => {
+                json!({ "jsonrpc": "2.0", "id": id, "result": { "resources": [] } })
+            }
             "tools/list" => {
                 json!({
                     "jsonrpc": "2.0",
@@ -136,39 +139,69 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "tools/call" => {
                 let tool_name = req["params"]["name"].as_str().unwrap_or("");
-                
+
                 if tool_name == "get_provenance" {
-                    let req_id = req["params"]["arguments"]["request_id"].as_str().unwrap_or("");
-                    match fetch_from_daemon(&client, "provenance", json!({ "request_id": req_id })).await {
-                        Ok(res) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": res.content }], "isError": res.is_error } }),
-                        Err(e) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": format!("Daemon Error: {}", e) }], "isError": true } }),
+                    let req_id = req["params"]["arguments"]["request_id"]
+                        .as_str()
+                        .unwrap_or("");
+                    match fetch_from_daemon(&client, "provenance", json!({ "request_id": req_id }))
+                        .await
+                    {
+                        Ok(res) => {
+                            json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": res.content }], "isError": res.is_error } })
+                        }
+                        Err(e) => {
+                            json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": format!("Daemon Error: {}", e) }], "isError": true } })
+                        }
                     }
                 } else if tool_name == "query_recon" {
                     match fetch_from_daemon(&client, "recon", json!({})).await {
-                        Ok(res) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": res.content }], "isError": res.is_error } }),
-                        Err(e) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": format!("Daemon Error: {}", e) }], "isError": true } }),
+                        Ok(res) => {
+                            json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": res.content }], "isError": res.is_error } })
+                        }
+                        Err(e) => {
+                            json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": format!("Daemon Error: {}", e) }], "isError": true } })
+                        }
                     }
                 } else if tool_name == "query_impact" {
                     let symbol = req["params"]["arguments"]["symbol"].as_str().unwrap_or("");
                     match fetch_from_daemon(&client, "impact", json!({ "symbol": symbol })).await {
-                        Ok(res) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": res.content }], "isError": res.is_error } }),
-                        Err(e) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": format!("Daemon Error: {}", e) }], "isError": true } }),
+                        Ok(res) => {
+                            json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": res.content }], "isError": res.is_error } })
+                        }
+                        Err(e) => {
+                            json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": format!("Daemon Error: {}", e) }], "isError": true } })
+                        }
                     }
                 } else if tool_name == "query_discovery" {
-                    let filename = req["params"]["arguments"]["filename"].as_str().unwrap_or("");
-                    match fetch_from_daemon(&client, "discovery", json!({ "filename": filename })).await {
-                        Ok(res) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": res.content }], "isError": res.is_error } }),
-                        Err(e) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": format!("Daemon Error: {}", e) }], "isError": true } }),
+                    let filename = req["params"]["arguments"]["filename"]
+                        .as_str()
+                        .unwrap_or("");
+                    match fetch_from_daemon(&client, "discovery", json!({ "filename": filename }))
+                        .await
+                    {
+                        Ok(res) => {
+                            json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": res.content }], "isError": res.is_error } })
+                        }
+                        Err(e) => {
+                            json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": format!("Daemon Error: {}", e) }], "isError": true } })
+                        }
                     }
                 } else {
                     let cmd = req["params"]["arguments"]["command"].as_str().unwrap_or("");
                     match forward_to_daemon(&client, cmd, tool_name).await {
-                        Ok(res) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": res.content }], "isError": res.is_error } }),
-                        Err(e) => json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": format!("Daemon Error: {}", e) }], "isError": true } }),
+                        Ok(res) => {
+                            json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": res.content }], "isError": res.is_error } })
+                        }
+                        Err(e) => {
+                            json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": format!("Daemon Error: {}", e) }], "isError": true } })
+                        }
                     }
                 }
             }
-            _ => json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32601, "message": "Method not found" } }),
+            _ => {
+                json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32601, "message": "Method not found" } })
+            }
         };
 
         let mut out = serde_json::to_string(&response)?;
@@ -177,17 +210,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stdout.write_all(out.as_bytes()).await?;
         stdout.flush().await?;
     }
-    
+
     tracing::info!("MCP Proxy shutting down.");
     Ok(())
 }
 
-async fn fetch_from_daemon(client: &Client, endpoint: &str, payload: Value) -> Result<DaemonResponse, Box<dyn std::error::Error>> {
-    let res = client.post(format!("{}/{}", DAEMON_URL, endpoint))
+async fn fetch_from_daemon(
+    client: &Client,
+    endpoint: &str,
+    payload: Value,
+) -> Result<DaemonResponse, Box<dyn std::error::Error>> {
+    let res = client
+        .post(format!("{}/{}", DAEMON_URL, endpoint))
         .json(&payload)
         .send()
         .await?;
-    
+
     let daemon_res: DaemonResponse = res.json().await?;
     Ok(daemon_res)
 }
@@ -198,12 +236,17 @@ struct DaemonResponse {
     is_error: bool,
 }
 
-async fn forward_to_daemon(client: &Client, command: &str, tool_name: &str) -> Result<DaemonResponse, Box<dyn std::error::Error>> {
-    let res = client.post(format!("{}/execute", DAEMON_URL))
+async fn forward_to_daemon(
+    client: &Client,
+    command: &str,
+    tool_name: &str,
+) -> Result<DaemonResponse, Box<dyn std::error::Error>> {
+    let res = client
+        .post(format!("{}/execute", DAEMON_URL))
         .json(&json!({ "command": command, "tool_name": tool_name }))
         .send()
         .await?;
-    
+
     let daemon_res: DaemonResponse = res.json().await?;
     Ok(daemon_res)
 }
@@ -239,9 +282,9 @@ async fn ensure_daemon_running(client: &Client) -> Result<(), Box<dyn std::error
     let current_exe = std::env::current_exe()?;
     let daemon_name = format!("{}{}", DAEMON_BIN, std::env::consts::EXE_SUFFIX);
     let daemon_path = current_exe.parent().unwrap().join(daemon_name);
-    
+
     tracing::info!("Spawning new daemon from: {}", daemon_path.display());
-    
+
     tokio::process::Command::new(&daemon_path)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -250,7 +293,7 @@ async fn ensure_daemon_running(client: &Client) -> Result<(), Box<dyn std::error
     // 4. Wait for health (up to 5 seconds)
     let start = Instant::now();
     let timeout = Duration::from_secs(5);
-    
+
     while start.elapsed() < timeout {
         if is_daemon_healthy(client).await {
             tracing::info!("Daemon successfully started and healthy.");
@@ -263,10 +306,11 @@ async fn ensure_daemon_running(client: &Client) -> Result<(), Box<dyn std::error
 }
 
 async fn is_daemon_healthy(client: &Client) -> bool {
-    match client.get(format!("{}/health", DAEMON_URL))
+    match client
+        .get(format!("{}/health", DAEMON_URL))
         .timeout(Duration::from_millis(500))
         .send()
-        .await 
+        .await
     {
         Ok(res) => res.status().is_success(),
         Err(_) => false,

@@ -297,77 +297,97 @@ async fn run_command(cli: Cli) -> Result<()> {
 
             // Perform conversion
             let start = Instant::now();
-            
+
             let mut _temp_file_guard = None;
             let actual_input = if input.to_str() == Some("-") {
                 if !cli.quiet {
                     println!("  Input:  (stdin spooled to single file)");
                 }
-                
+
                 use std::io::{self, Read};
                 let mut stdin = io::stdin().lock();
-                
+
                 // Allow overriding temp dir for testing
-                let custom_temp = std::env::var("TRANSMUTATION_TEMP_DIR").ok().map(PathBuf::from);
+                let custom_temp = std::env::var("TRANSMUTATION_TEMP_DIR")
+                    .ok()
+                    .map(PathBuf::from);
                 if let Some(ref d) = custom_temp {
-                    std::fs::create_dir_all(d).map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                    std::fs::create_dir_all(d)
+                        .map_err(|e| transmutation::TransmutationError::IoError(e))?;
                 }
-                
+
                 // 1. Sniff the first 8KB to determine the true file format
                 let mut sniff_buffer = vec![0; 8192];
                 let mut sniff_len = 0;
                 while sniff_len < 8192 {
-                    let n = stdin.read(&mut sniff_buffer[sniff_len..]).map_err(|e| transmutation::TransmutationError::IoError(e))?;
-                    if n == 0 { break; }
+                    let n = stdin
+                        .read(&mut sniff_buffer[sniff_len..])
+                        .map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                    if n == 0 {
+                        break;
+                    }
                     sniff_len += n;
                 }
                 sniff_buffer.truncate(sniff_len);
-                
+
                 // Detect format using file-format crate natively
                 let format_detector = file_format::FileFormat::from_bytes(&sniff_buffer);
                 let detected_ext = format_detector.extension();
-                
+
                 // The temp file represents the INPUT, so it must use the detected input extension.
                 let final_ext = if detected_ext == "id3" {
-                     "mp3"
+                    "mp3"
                 } else if detected_ext != "bin" && !detected_ext.is_empty() {
-                     detected_ext
+                    detected_ext
                 } else {
-                     "txt"
+                    "txt"
                 };
 
                 let mut builder = tempfile::Builder::new();
                 builder.prefix("transmutation_pipe_");
                 let ext_string = format!(".{}", final_ext);
                 builder.suffix(&ext_string);
-                
+
                 let mut temp_file = match custom_temp {
-                    Some(ref d) => builder.tempfile_in(d).map_err(|e| transmutation::TransmutationError::IoError(e))?,
-                    None => builder.tempfile().map_err(|e| transmutation::TransmutationError::IoError(e))?,
+                    Some(ref d) => builder
+                        .tempfile_in(d)
+                        .map_err(|e| transmutation::TransmutationError::IoError(e))?,
+                    None => builder
+                        .tempfile()
+                        .map_err(|e| transmutation::TransmutationError::IoError(e))?,
                 };
-                
+
                 if !cli.quiet {
-                    println!("  Detected Stream Format: .{} (via {})", final_ext, format_detector.media_type());
+                    println!(
+                        "  Detected Stream Format: .{} (via {})",
+                        final_ext,
+                        format_detector.media_type()
+                    );
                     println!("  Streaming stdin to disk... (Constant RAM usage)");
                 }
-                
+
                 // Write the sniffed bytes first
-                temp_file.write_all(&sniff_buffer).map_err(|e| transmutation::TransmutationError::IoError(e))?;
-                
+                temp_file
+                    .write_all(&sniff_buffer)
+                    .map_err(|e| transmutation::TransmutationError::IoError(e))?;
+
                 // Spool the rest of the stream into the single temp file
-                std::io::copy(&mut stdin, &mut temp_file).map_err(|e| transmutation::TransmutationError::IoError(e))?;
-                temp_file.flush().map_err(|e| transmutation::TransmutationError::IoError(e))?;
-                
+                std::io::copy(&mut stdin, &mut temp_file)
+                    .map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                temp_file
+                    .flush()
+                    .map_err(|e| transmutation::TransmutationError::IoError(e))?;
+
                 let path = temp_file.path().to_path_buf();
-                
+
                 if custom_temp.is_some() {
-                     // Leak the temp file for testing purposes so the test script can inspect it
-                     let (_, path) = temp_file.keep().unwrap();
-                     path
+                    // Leak the temp file for testing purposes so the test script can inspect it
+                    let (_, path) = temp_file.keep().unwrap();
+                    path
                 } else {
-                     // Keep the guard so it deletes at the end of scope
-                     _temp_file_guard = Some(temp_file);
-                     path
+                    // Keep the guard so it deletes at the end of scope
+                    _temp_file_guard = Some(temp_file);
+                    path
                 }
             } else {
                 if !cli.quiet {
@@ -382,19 +402,28 @@ async fn run_command(cli: Cli) -> Result<()> {
                 .with_options(options)
                 .execute()
                 .await?;
-                
+
             let duration = start.elapsed();
 
             // Save output(s)
             if result.content.len() > 1 {
-                let stem = output_path.file_stem().and_then(|s| s.to_str()).unwrap_or("output");
+                let stem = output_path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("output");
                 let parent = if let Some(ref dir) = output_dir {
                     tokio::fs::create_dir_all(dir).await?;
                     dir.clone()
                 } else {
-                    output_path.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| PathBuf::from("."))
+                    output_path
+                        .parent()
+                        .map(|p| p.to_path_buf())
+                        .unwrap_or_else(|| PathBuf::from("."))
                 };
-                let ext = output_path.extension().and_then(|e| e.to_str()).unwrap_or("md");
+                let ext = output_path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("md");
 
                 for chunk in &result.content {
                     let page_path = parent.join(format!("{}_{}.{}", stem, chunk.page_number, ext));
@@ -410,8 +439,14 @@ async fn run_command(cli: Cli) -> Result<()> {
                 println!("{}", "Statistics:".yellow().bold());
                 println!("  Duration:     {:?}", duration);
                 println!("  Pages:        {}", result.statistics.pages_processed);
-                println!("  Input size:   {:.2} MB", result.statistics.input_size_bytes as f64 / 1_000_000.0);
-                println!("  Output size:  {:.2} MB", result.statistics.output_size_bytes as f64 / 1_000_000.0);
+                println!(
+                    "  Input size:   {:.2} MB",
+                    result.statistics.input_size_bytes as f64 / 1_000_000.0
+                );
+                println!(
+                    "  Output size:  {:.2} MB",
+                    result.statistics.output_size_bytes as f64 / 1_000_000.0
+                );
             }
 
             Ok(())
@@ -429,14 +464,15 @@ async fn run_command(cli: Cli) -> Result<()> {
             }
 
             let start_shell = Instant::now();
-            
+
             // 1. Spool child output to a temporary file
             let mut builder = tempfile::Builder::new();
             builder.prefix("transmutation_run_");
             builder.suffix(".txt");
-            let mut temp_file = builder.tempfile()
+            let mut temp_file = builder
+                .tempfile()
                 .map_err(|e| transmutation::TransmutationError::IoError(e))?;
-            
+
             // 2. Spawn and capture (Merged stdout/stderr)
             let mut child = std::process::Command::new(&command[0])
                 .args(&command[1..])
@@ -447,14 +483,18 @@ async fn run_command(cli: Cli) -> Result<()> {
 
             let mut stdout = child.stdout.take().unwrap();
             let mut stderr = child.stderr.take().unwrap();
-            
+
             // Stream both to the same file
-            std::io::copy(&mut stdout, &mut temp_file).map_err(|e| transmutation::TransmutationError::IoError(e))?;
-            std::io::copy(&mut stderr, &mut temp_file).map_err(|e| transmutation::TransmutationError::IoError(e))?;
-            
-            let status = child.wait().map_err(|e| transmutation::TransmutationError::IoError(e))?;
+            std::io::copy(&mut stdout, &mut temp_file)
+                .map_err(|e| transmutation::TransmutationError::IoError(e))?;
+            std::io::copy(&mut stderr, &mut temp_file)
+                .map_err(|e| transmutation::TransmutationError::IoError(e))?;
+
+            let status = child
+                .wait()
+                .map_err(|e| transmutation::TransmutationError::IoError(e))?;
             let shell_duration = start_shell.elapsed();
-            
+
             if !cli.quiet {
                 println!("  Status:  {}", status);
                 println!("  Shell Time: {:?}", shell_duration);
@@ -463,7 +503,7 @@ async fn run_command(cli: Cli) -> Result<()> {
             // 3. Convert/Prune spooled output
             let start_proxy = Instant::now();
             let converter = Converter::new()?;
-            
+
             let output_format = match format {
                 OutputFormatArg::Markdown => OutputFormat::Markdown {
                     split_pages: false,
@@ -499,7 +539,7 @@ async fn run_command(cli: Cli) -> Result<()> {
                 .to(output_format)
                 .execute()
                 .await?;
-            
+
             let proxy_duration = start_proxy.elapsed();
 
             // 4. Persistence & Audit
@@ -527,7 +567,7 @@ async fn run_command(cli: Cli) -> Result<()> {
 
         Commands::Batch { .. } => Ok(()), // Placeholder
         Commands::Info { .. } => Ok(()),  // Placeholder
-        Commands::Formats => Ok(()),     // Placeholder
+        Commands::Formats => Ok(()),      // Placeholder
         Commands::Version => {
             println!("Transmutation CLI v{}", transmutation::VERSION);
             Ok(())
@@ -557,22 +597,32 @@ fn offload_to_sqlite(record: &AuditLogRecord) -> Result<()> {
     let db_dir = dirs::home_dir()
         .map(|p| p.join(".transmutation"))
         .unwrap_or_else(|| PathBuf::from("."));
-    
+
     std::fs::create_dir_all(&db_dir).map_err(|e| transmutation::TransmutationError::IoError(e))?;
     let db_path = db_dir.join("audit.db");
 
     // Purge logic (1GB Budget)
     if let Ok(metadata) = std::fs::metadata(&db_path) {
         if metadata.len() > 1000 * 1024 * 1024 {
-            let conn = rusqlite::Connection::open(&db_path)
-                .map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Connection failed", e))?;
+            let conn = rusqlite::Connection::open(&db_path).map_err(|e| {
+                transmutation::TransmutationError::engine_error_with_source(
+                    "SQLite",
+                    "Connection failed",
+                    e,
+                )
+            })?;
             let _ = conn.execute("DELETE FROM audit_events WHERE timestamp IN (SELECT timestamp FROM audit_events ORDER BY timestamp ASC LIMIT 500)", []);
             let _ = conn.execute("VACUUM", []);
         }
     }
 
-    let conn = rusqlite::Connection::open(&db_path)
-        .map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Connection failed", e))?;
+    let conn = rusqlite::Connection::open(&db_path).map_err(|e| {
+        transmutation::TransmutationError::engine_error_with_source(
+            "SQLite",
+            "Connection failed",
+            e,
+        )
+    })?;
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS audit_events (
@@ -585,7 +635,14 @@ fn offload_to_sqlite(record: &AuditLogRecord) -> Result<()> {
             output_bytes INTEGER
         )",
         [],
-    ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Table creation failed", e))?;
+    )
+    .map_err(|e| {
+        transmutation::TransmutationError::engine_error_with_source(
+            "SQLite",
+            "Table creation failed",
+            e,
+        )
+    })?;
 
     conn.execute(
         "INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -598,7 +655,10 @@ fn offload_to_sqlite(record: &AuditLogRecord) -> Result<()> {
             record.input_bytes as i64,
             record.output_bytes as i64,
         ],
-    ).map_err(|e| transmutation::TransmutationError::engine_error_with_source("SQLite", "Insert failed", e))?;
+    )
+    .map_err(|e| {
+        transmutation::TransmutationError::engine_error_with_source("SQLite", "Insert failed", e)
+    })?;
 
     Ok(())
 }

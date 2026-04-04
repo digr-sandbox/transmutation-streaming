@@ -216,40 +216,40 @@ fn check_external_dependencies() {
             ));
         }
     }
-// Check tesseract feature dependencies
-#[cfg(feature = "tesseract")]
-{
-    if !command_exists("tesseract") {
-        warnings.push((
-            "Tesseract OCR",
-            "Image → Text (OCR)",
-            get_install_command("tesseract"),
-        ));
-    }
-}
-
-if !warnings.is_empty() {
-    eprintln!();
-    eprintln!("╔════════════════════════════════════════════════════════════╗");
-    eprintln!("║  ⚠️  Optional External Dependencies Missing             ║");
-    eprintln!("╚════════════════════════════════════════════════════════════╝");
-    eprintln!();
-    eprintln!("Transmutation will compile, but some features won't work:");
-    eprintln!();
-
-    for (tool, feature, install_cmd) in &warnings {
-        eprintln!("  ❌ {tool}: {feature}");
-        eprintln!("     Install: {install_cmd}");
+    // Check tesseract feature dependencies
+    #[cfg(feature = "tesseract")]
+    {
+        if !command_exists("tesseract") {
+            warnings.push((
+                "Tesseract OCR",
+                "Image → Text (OCR)",
+                get_install_command("tesseract"),
+            ));
+        }
     }
 
-    eprintln!();
-    eprintln!("📖 For detailed installation instructions:");
-    eprintln!("   https://github.com/hivellm/transmutation/blob/main/install/README.md");
-    eprintln!();
-    eprintln!("💡 Quick install (all dependencies):");
-    eprintln!("{}", get_quick_install_all());
-    eprintln!();
-}
+    if !warnings.is_empty() {
+        eprintln!();
+        eprintln!("╔════════════════════════════════════════════════════════════╗");
+        eprintln!("║  ⚠️  Optional External Dependencies Missing             ║");
+        eprintln!("╚════════════════════════════════════════════════════════════╝");
+        eprintln!();
+        eprintln!("Transmutation will compile, but some features won't work:");
+        eprintln!();
+
+        for (tool, feature, install_cmd) in &warnings {
+            eprintln!("  ❌ {tool}: {feature}");
+            eprintln!("     Install: {install_cmd}");
+        }
+
+        eprintln!();
+        eprintln!("📖 For detailed installation instructions:");
+        eprintln!("   https://github.com/hivellm/transmutation/blob/main/install/README.md");
+        eprintln!();
+        eprintln!("💡 Quick install (all dependencies):");
+        eprintln!("{}", get_quick_install_all());
+        eprintln!();
+    }
 }
 /// Check if a command exists in PATH
 #[allow(dead_code)]

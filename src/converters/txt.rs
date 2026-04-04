@@ -94,25 +94,26 @@ impl DocumentConverter for TxtConverter {
 
         // Check file size and start reading
         let input_size = fs::metadata(input).await?.len();
-        
+
         // Convert to requested format
         let output_data = match output_format {
             OutputFormat::Markdown { .. } => {
                 eprintln!("📝 Converting to Markdown...");
-                
+
                 let mut markdown = String::new();
                 markdown.push_str("# Document\n\n");
-                
+
                 use std::io::BufRead;
-                let file = std::fs::File::open(input).map_err(|e| crate::TransmutationError::IoError(e))?;
+                let file = std::fs::File::open(input)
+                    .map_err(|e| crate::TransmutationError::IoError(e))?;
                 let reader = std::io::BufReader::new(file);
-                
+
                 let mut in_paragraph = false;
-                
+
                 for line in reader.lines() {
                     let line = line.unwrap_or_else(|_| String::new());
                     let trimmed = line.trim();
-                    
+
                     if trimmed.is_empty() {
                         if in_paragraph {
                             markdown.push_str("\n\n");
@@ -126,7 +127,7 @@ impl DocumentConverter for TxtConverter {
                         in_paragraph = true;
                     }
                 }
-                
+
                 if in_paragraph {
                     markdown.push('\n');
                 }

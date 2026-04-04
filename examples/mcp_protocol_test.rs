@@ -1,5 +1,6 @@
-use std::io::{Write, BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
+
 use serde_json::json;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -8,7 +9,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 1. Spawn the MCP proxy binary
     let mut child = Command::new("cargo")
-        .args(["run", "--release", "--quiet", "--features", "cli", "--bin", "transmutation-mcp-proxy"])
+        .args([
+            "run",
+            "--release",
+            "--quiet",
+            "--features",
+            "cli",
+            "--bin",
+            "transmutation-mcp-proxy",
+        ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -27,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "params": {}
     });
     writeln!(stdin, "{}", init_req)?;
-    
+
     let mut line = String::new();
     reader.read_line(&mut line)?;
     println!("   Response: {}", line.trim());
@@ -43,7 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "params": {}
     });
     writeln!(stdin, "{}", list_req)?;
-    
+
     line.clear();
     reader.read_line(&mut line)?;
     println!("   Response: {}", line.trim());
@@ -59,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "params": {}
     });
     writeln!(stdin, "{}", ping_req)?;
-    
+
     line.clear();
     reader.read_line(&mut line)?;
     println!("   Response: {}", line.trim());
@@ -68,10 +77,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // TEST 4: Protocol Error (Malformed JSON)
     println!("\n▶️  [ERROR] Sending malformed JSON...");
     writeln!(stdin, "{{{{{{ illegal_json }}}}")?; // Intentional malformed JSON
-    
+
     // Note: The server might skip malformed lines or return an error depending on the loop.
     // Our current loop skips, but let's verify connectivity remains.
-    
+
     // TEST 5: Valid Execution
     println!("\n▶️  [EXEC] Sending valid command...");
     let exec_req = json!({
@@ -84,14 +93,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
     writeln!(stdin, "{}", exec_req)?;
-    
+
     line.clear();
     reader.read_line(&mut line)?;
     println!("   Response: {}", line.trim());
     assert!(line.contains("protocol-verified"));
 
     println!("\n✨ PROTOCOL SUCCESS: 2026 Model Context Protocol standards verified.");
-    
+
     // Kill the child
     drop(stdin);
     let _ = child.wait();

@@ -1,4 +1,5 @@
 use std::path::Path;
+
 use tempfile::tempdir;
 use transmutation::{Converter, OutputFormat};
 
@@ -18,21 +19,26 @@ fn create_real_xlsx(path: &Path) {
     use umya_spreadsheet::*;
     let mut book = Spreadsheet::default();
     let _ = book.new_sheet("Sheet1").unwrap();
-    book.get_sheet_mut(&0).unwrap().get_cell_mut("A1").set_value("Hello Transmutation XLSX!");
+    book.get_sheet_mut(&0)
+        .unwrap()
+        .get_cell_mut("A1")
+        .set_value("Hello Transmutation XLSX!");
     writer::xlsx::write(&book, path).unwrap();
 }
 
-// For PPTX, I don't have a dedicated crate to create it easily, 
+// For PPTX, I don't have a dedicated crate to create it easily,
 // so I'll try to make the minimal ZIP better.
 fn create_better_pptx(path: &Path) -> std::io::Result<()> {
     use std::fs::File;
     use std::io::Write;
-    use zip::write::FileOptions;
+
     use zip::ZipWriter;
+    use zip::write::FileOptions;
 
     let file = File::create(path)?;
     let mut zip = ZipWriter::new(file);
-    let options: FileOptions<()> = FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    let options: FileOptions<()> =
+        FileOptions::default().compression_method(zip::CompressionMethod::Stored);
 
     // Marker file for detection
     zip.start_file("ppt/presentation.xml", options)?;
@@ -54,7 +60,7 @@ fn create_better_pptx(path: &Path) -> std::io::Result<()> {
         </p:spTree>
     </p:cSld>
 </p:sld>"#.as_bytes())?;
-    
+
     zip.finish()?;
     Ok(())
 }
@@ -69,15 +75,21 @@ async fn test_docx_conversion() {
     let converter = Converter::new().unwrap();
     let result = converter
         .convert(&file_path)
-        .to(OutputFormat::Markdown { split_pages: false, optimize_for_llm: true })
+        .to(OutputFormat::Markdown {
+            split_pages: false,
+            optimize_for_llm: true,
+        })
         .execute()
         .await
         .unwrap();
 
     let output_text = String::from_utf8_lossy(&result.content[0].data);
     assert!(output_text.contains("Hello Transmutation DOCX!"));
-    
-    println!("DOCX Compaction: {} bytes -> {} bytes", result.statistics.input_size_bytes, result.statistics.output_size_bytes);
+
+    println!(
+        "DOCX Compaction: {} bytes -> {} bytes",
+        result.statistics.input_size_bytes, result.statistics.output_size_bytes
+    );
 }
 
 #[tokio::test]
@@ -89,15 +101,21 @@ async fn test_pptx_conversion() {
     let converter = Converter::new().unwrap();
     let result = converter
         .convert(&file_path)
-        .to(OutputFormat::Markdown { split_pages: false, optimize_for_llm: true })
+        .to(OutputFormat::Markdown {
+            split_pages: false,
+            optimize_for_llm: true,
+        })
         .execute()
         .await
         .unwrap();
 
     let output_text = String::from_utf8_lossy(&result.content[0].data);
     assert!(output_text.contains("Hello Transmutation PPTX!"));
-    
-    println!("PPTX Compaction: {} bytes -> {} bytes", result.statistics.input_size_bytes, result.statistics.output_size_bytes);
+
+    println!(
+        "PPTX Compaction: {} bytes -> {} bytes",
+        result.statistics.input_size_bytes, result.statistics.output_size_bytes
+    );
 }
 
 #[tokio::test]
@@ -110,13 +128,19 @@ async fn test_xlsx_conversion() {
     let converter = Converter::new().unwrap();
     let result = converter
         .convert(&file_path)
-        .to(OutputFormat::Markdown { split_pages: false, optimize_for_llm: true })
+        .to(OutputFormat::Markdown {
+            split_pages: false,
+            optimize_for_llm: true,
+        })
         .execute()
         .await
         .unwrap();
 
     let output_text = String::from_utf8_lossy(&result.content[0].data);
     assert!(output_text.contains("Hello Transmutation XLSX!"));
-    
-    println!("XLSX Compaction: {} bytes -> {} bytes", result.statistics.input_size_bytes, result.statistics.output_size_bytes);
+
+    println!(
+        "XLSX Compaction: {} bytes -> {} bytes",
+        result.statistics.input_size_bytes, result.statistics.output_size_bytes
+    );
 }

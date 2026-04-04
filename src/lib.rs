@@ -275,7 +275,10 @@ impl ConversionBuilder {
         // Format not supported or feature not enabled
         let feature_hint = if input_format.is_image() {
             " (enable 'image-ocr' feature)"
-        } else if matches!(input_format, FileFormat::Docx | FileFormat::Xlsx | FileFormat::Pptx) {
+        } else if matches!(
+            input_format,
+            FileFormat::Docx | FileFormat::Xlsx | FileFormat::Pptx
+        ) {
             " (enable 'office' feature)"
         } else {
             ""

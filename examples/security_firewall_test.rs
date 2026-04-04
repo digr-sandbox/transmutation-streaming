@@ -1,5 +1,6 @@
-use std::io::{Write, BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
+
 use serde_json::json;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -7,7 +8,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("===========================================");
 
     let mut child = Command::new("cargo")
-        .args(["run", "--quiet", "--features", "cli", "--bin", "transmutation-mcp-proxy"])
+        .args([
+            "run",
+            "--quiet",
+            "--features",
+            "cli",
+            "--bin",
+            "transmutation-mcp-proxy",
+        ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -32,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for (cmd, rule) in &security_tests {
         println!("\n🛡️  Testing Rule: {} | Command: '{}'", rule, cmd);
-        
+
         let req = json!({
             "jsonrpc": "2.0",
             "id": format!("test_{}", rule),
@@ -43,11 +51,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         });
         writeln!(stdin, "{}", req)?;
-        
+
         let mut line = String::new();
         reader.read_line(&mut line)?;
         let resp: serde_json::Value = serde_json::from_str(&line)?;
-        
+
         let text = resp["result"]["content"][0]["text"].as_str().unwrap_or("");
         let is_error = resp["result"]["isError"].as_bool().unwrap_or(false);
 
@@ -75,8 +83,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         passed += 1;
     }
 
-    println!("\n✨ SECURITY SUMMARY: {}/{} tests passed.", passed, security_tests.len() + 1);
-    
+    println!(
+        "\n✨ SECURITY SUMMARY: {}/{} tests passed.",
+        passed,
+        security_tests.len() + 1
+    );
+
     drop(stdin);
     let _ = child.wait();
     Ok(())

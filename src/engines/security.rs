@@ -1,6 +1,7 @@
+use std::fs;
+
 use regex::Regex;
 use serde::Deserialize;
-use std::fs;
 
 #[derive(Deserialize, Debug)]
 pub struct RawRule {
@@ -43,14 +44,18 @@ fn simple_eval_bool(expr: &str) -> bool {
         s = s.replace("false||true", "true");
         s = s.replace("false||false", "false");
 
-        if s == old_s { break; }
+        if s == old_s {
+            break;
+        }
     }
 
     s == "true"
 }
 
 impl SecurityEngine {
-    pub fn load_from_str(json_content: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn load_from_str(
+        json_content: &str,
+    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let raw_rules: Vec<RawRule> = serde_json::from_str(json_content)?;
         let mut compiled_rules = Vec::new();
 
@@ -79,10 +84,14 @@ impl SecurityEngine {
                 pattern_map,
             });
         }
-        Ok(SecurityEngine { rules: compiled_rules })
+        Ok(SecurityEngine {
+            rules: compiled_rules,
+        })
     }
 
-    pub fn load_from_file(path: &std::path::Path) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn load_from_file(
+        path: &std::path::Path,
+    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let file_content = fs::read_to_string(path)?;
         Self::load_from_str(&file_content)
     }
@@ -99,8 +108,14 @@ impl SecurityEngine {
             let mut eval_logic = rule.logic.clone();
 
             // Replace tool name checks
-            eval_logic = eval_logic.replace("t.function.name == 'execute_secure_command'", &(tool_name == "execute_secure_command").to_string());
-            eval_logic = eval_logic.replace("t.function.name == 'delete_file'", &(tool_name == "delete_file").to_string());
+            eval_logic = eval_logic.replace(
+                "t.function.name == 'execute_secure_command'",
+                &(tool_name == "execute_secure_command").to_string(),
+            );
+            eval_logic = eval_logic.replace(
+                "t.function.name == 'delete_file'",
+                &(tool_name == "delete_file").to_string(),
+            );
 
             // Replace matches calls
             for (pattern_str, regex) in &rule.pattern_map {
@@ -113,7 +128,10 @@ impl SecurityEngine {
             eval_logic = eval_logic.replace("t.function.name", "false");
 
             if simple_eval_bool(&eval_logic) {
-                return Some(format!("[SECURITY BLOCKED: {}] {}", rule.name, rule.message));
+                return Some(format!(
+                    "[SECURITY BLOCKED: {}] {}",
+                    rule.name, rule.message
+                ));
             }
         }
         None
@@ -148,8 +166,20 @@ mod tests {
     #[test]
     fn test_safe_commands_pass() {
         let engine = get_test_engine();
-        assert!(engine.evaluate("npm install", "execute_secure_command", "linux").is_none());
-        assert!(engine.evaluate("timeout 300s npm run build", "execute_secure_command", "linux").is_none());
+        assert!(
+            engine
+                .evaluate("npm install", "execute_secure_command", "linux")
+                .is_none()
+        );
+        assert!(
+            engine
+                .evaluate(
+                    "timeout 300s npm run build",
+                    "execute_secure_command",
+                    "linux"
+                )
+                .is_none()
+        );
     }
 
     #[test]

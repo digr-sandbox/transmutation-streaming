@@ -5,8 +5,8 @@
 // Core engines (always enabled for PDF support)
 pub mod layout_analyzer;
 pub mod pdf_parser;
-pub mod table_detector;
 pub mod security;
+pub mod table_detector;
 
 // Advanced FFI engines (optional)
 #[cfg(feature = "docling-ffi")]

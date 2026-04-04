@@ -1,5 +1,6 @@
-use std::io::{Write, BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
+
 use serde_json::json;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -8,7 +9,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 1. Spawn the MCP proxy binary
     let mut child = Command::new("cargo")
-        .args(["run", "--quiet", "--features", "cli", "--bin", "transmutation-mcp-proxy"])
+        .args([
+            "run",
+            "--quiet",
+            "--features",
+            "cli",
+            "--bin",
+            "transmutation-mcp-proxy",
+        ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -27,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "params": {}
     });
     writeln!(stdin, "{}", init_req)?;
-    
+
     let mut line = String::new();
     reader.read_line(&mut line)?;
     println!("  Result: {}", line.trim());
@@ -42,7 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "params": {}
     });
     writeln!(stdin, "{}", ping_req)?;
-    
+
     line.clear();
     reader.read_line(&mut line)?;
     println!("  Result: {}", line.trim());
@@ -60,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
     writeln!(stdin, "{}", call_req)?;
-    
+
     line.clear();
     reader.read_line(&mut line)?;
     println!("  Result: {}", line.trim());
@@ -79,15 +87,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
     writeln!(stdin, "{}", block_req)?;
-    
+
     line.clear();
     reader.read_line(&mut line)?;
     println!("  Result: {}", line.trim());
     assert!(line.contains("SECURITY BLOCKED"));
     assert!(line.contains("\"isError\":true"));
 
-    println!("\n✨ INTEGRATION SUCCESS: All layers (Security -> Shell -> Transmute -> Audit) verified.");
-    
+    println!(
+        "\n✨ INTEGRATION SUCCESS: All layers (Security -> Shell -> Transmute -> Audit) verified."
+    );
+
     // Kill the child gracefully
     drop(stdin);
     let _ = child.wait();
