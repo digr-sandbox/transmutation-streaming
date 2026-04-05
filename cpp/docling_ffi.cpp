@@ -4,13 +4,14 @@
  */
 
 #include "docling_ffi.h"
-#include <v2.h>
+#include <parse.h>
 #include <resources.h>
 #include <string>
 #include <memory>
 #include <cstring>
 #include <fstream>
 #include <filesystem>
+#include <iostream>
 
 // Thread-local error message
 thread_local std::string g_last_error;
@@ -143,7 +144,7 @@ DoclingError docling_export_markdown(DoclingDocumentHandle handle, char** out_ma
         
         // Set the resources directory BEFORE creating the parser
         std::filesystem::path root_path(ROOT_PATH);
-        std::filesystem::path resources_path = root_path / "docling_parse" / "pdf_resources_v2";
+        std::filesystem::path resources_path = root_path / "docling_parse" / "pdf_resources";
         resources_path = std::filesystem::absolute(resources_path);
         
         if (!std::filesystem::exists(resources_path)) {
@@ -154,11 +155,11 @@ DoclingError docling_export_markdown(DoclingDocumentHandle handle, char** out_ma
         
         // Set the resources directory globally using resource_utils
         std::cerr << "[FFI] Setting resources directory: " << resources_path << std::endl;
-        bool set_result = resource_utils::set_resources_v2_dir(resources_path);
-        std::cerr << "[FFI] set_resources_v2_dir result: " << (set_result ? "SUCCESS" : "FAILED") << std::endl;
+        bool set_result = resource_utils::set_resources_dir(resources_path);
+        std::cerr << "[FFI] set_resources_dir result: " << (set_result ? "SUCCESS" : "FAILED") << std::endl;
         
         // Verify it was set correctly
-        auto current_resources = resource_utils::get_resources_v2_dir(false);
+        auto current_resources = resource_utils::get_resources_dir(false);
         std::cerr << "[FFI] Current resources directory: " << current_resources << std::endl;
         
         if (!set_result) {
@@ -170,6 +171,9 @@ DoclingError docling_export_markdown(DoclingDocumentHandle handle, char** out_ma
         // Parse PDF with docling-parse
         plib::parser parser("error");
         
+        // Create default decode config
+        pdflib::decode_config decode_cfg;
+        
         // Create temporary output file for JSON result
         std::string json_output = doc->pdf_path + ".json";
         doc->config["files"]["pdf"]["filename"] = doc->pdf_path;
@@ -179,7 +183,7 @@ DoclingError docling_export_markdown(DoclingDocumentHandle handle, char** out_ma
         // Log configuration
         std::cerr << "[FFI] Parsing " << doc->pdf_path << " -> " << json_output << std::endl;
         
-        parser.parse(doc->config, false);
+        parser.parse(doc->config, decode_cfg);
         
         std::cerr << "[FFI] Parse completed" << std::endl;
         
@@ -197,7 +201,6 @@ DoclingError docling_export_markdown(DoclingDocumentHandle handle, char** out_ma
         std::cerr << "[FFI] JSON loaded successfully" << std::endl;
         
         // Return the full JSON string for Rust to parse
-        // Rust has better tools for parsing complex JSON structures
         std::string json_str = result.dump();
         std::cerr << "[FFI] Returning JSON string, size: " << json_str.length() << " bytes" << std::endl;
         
