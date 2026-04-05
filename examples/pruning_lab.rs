@@ -16,7 +16,7 @@ fn calculate_idf(words: &[String]) -> HashMap<String, f64> {
         .into_iter()
         .map(|(word, count)| {
             // Formula: ln(Total Words / Word Count)
-            let score = (total / count as f64).ln();
+            let score = (total / f64::from(count as u32)).ln();
             (word, score)
         })
         .collect()
@@ -38,7 +38,7 @@ fn calculate_entropy(words: &[String]) -> Vec<f64> {
                 .collect::<std::collections::HashSet<_>>()
                 .len();
             // Ratio of unique words in the window
-            unique_count as f64 / window.len() as f64
+            f64::from(unique_count as u32) / window.len() as f64
         })
         .collect()
 }
@@ -88,7 +88,8 @@ fn main() {
         }
         i += 1;
     }
-    println!("✅ Generated {} tokens.", words.len());
+    let token_count = words.len();
+    println!("✅ Generated {token_count} tokens.");
 
     // 2. Run Feature Isolation Tests
     let start = Instant::now();
@@ -100,7 +101,7 @@ fn main() {
     let entropy_scores = calculate_entropy(&words);
 
     let duration = start.elapsed();
-    println!("✨ Analysis Complete in {:?}", duration);
+    println!("✨ Analysis Complete in {duration:?}");
 
     // 3. Display Findings
     println!("\n📊 [FEATURE 1: IDF] Top Results:");
@@ -109,27 +110,23 @@ fn main() {
 
     println!("   Top 3 Unique (Signal):");
     for (w, s) in idf_vec.iter().take(3) {
-        println!("     - {:<15} (Score: {:.2})", w, s);
+        println!("     - {w:<15} (Score: {s:.2})");
     }
 
     println!("   Top 3 Common (Noise):");
     for (w, s) in idf_vec.iter().rev().take(3) {
-        println!("     - {:<15} (Score: {:.2})", w, s);
+        println!("     - {w:<15} (Score: {s:.2})");
     }
 
     println!("\n📊 [FEATURE 2: ENTROPY] Repetition Detection:");
     // Find a known low-entropy zone (the dots)
     let spam_idx = words.iter().position(|w| w.contains("...")).unwrap();
-    println!(
-        "   Low Entropy Zone (Spam):  {:.2}",
-        entropy_scores[spam_idx]
-    );
+    let spam_score = entropy_scores[spam_idx];
+    println!("   Low Entropy Zone (Spam):  {spam_score:.2}");
     // Find a high-entropy zone (the error)
     let signal_idx = words.iter().position(|w| w.contains("127.0.0.1")).unwrap();
-    println!(
-        "   High Entropy Zone (Signal): {:.2}",
-        entropy_scores[signal_idx]
-    );
+    let signal_score = entropy_scores[signal_idx];
+    println!("   High Entropy Zone (Signal): {signal_score:.2}");
 
     // 4. Combined Result Simulation
     println!("\n📊 [COMBINED] Pruning Simulation (50% Target):");
@@ -138,7 +135,7 @@ fn main() {
 
     // Demonstrate pruning on a sample line
     let sample_line = "warning: the deprecated api is in src/lib.rs";
-    print!("   Sample: \"{}\"\n   Result: \"", sample_line);
+    print!("   Sample: \"{sample_line}\"\n   Result: \"");
     for word in sample_line.split_whitespace() {
         let idf = idf_map.get(word).copied().unwrap_or(5.0);
         let pos = calculate_pos_score(word);
@@ -146,14 +143,12 @@ fn main() {
 
         if combined > 3.0 {
             // Arbitrary threshold
-            print!("{} ", word);
+            print!("{word} ");
             kept += 1;
         }
         total += 1;
     }
     println!("\"");
-    println!(
-        "   Retention Rate: {:.1}%",
-        (kept as f64 / total as f64) * 100.0
-    );
+    let retention_rate = (f64::from(kept as u32) / f64::from(total as u32)) * 100.0;
+    println!("   Retention Rate: {retention_rate:.1}%");
 }

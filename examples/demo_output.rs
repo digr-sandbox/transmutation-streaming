@@ -1,4 +1,3 @@
-use std::collections::{HashMap, HashSet};
 use std::fs;
 
 use regex::Regex;
@@ -42,21 +41,20 @@ fn flatten_toon(val: &serde_json::Value, out: &mut String, prefix: &str) {
                 let new_prefix = if prefix.is_empty() {
                     k.clone()
                 } else {
-                    format!("{}.{}", prefix, k)
+                    format!("{prefix}.{k}")
                 };
                 if v.is_object() || v.is_array() {
                     flatten_toon(v, out, &new_prefix);
                 } else {
                     out.push_str(&format!(
-                        "{}:{} ",
-                        new_prefix,
+                        "{new_prefix}:{} ",
                         v.to_string().trim_matches('"')
                     ));
                 }
             }
         }
         serde_json::Value::Array(arr) => {
-            out.push_str(&format!("{}[{}]: ", prefix, arr.len()));
+            out.push_str(&format!("{prefix}[{}]: ", arr.len()));
             for v in arr {
                 if v.is_string() || v.is_number() || v.is_boolean() {
                     out.push_str(&format!("{} ", v.to_string().trim_matches('"')));
@@ -65,8 +63,7 @@ fn flatten_toon(val: &serde_json::Value, out: &mut String, prefix: &str) {
         }
         _ => {
             out.push_str(&format!(
-                "{}:{} ",
-                prefix,
+                "{prefix}:{} ",
                 val.to_string().trim_matches('"')
             ));
         }
@@ -122,7 +119,7 @@ fn structural_extraction(original_input: &str) -> String {
     }
 
     let mut result = "[DEPENDENCY MAP (k=1)]\n".to_string();
-    let mut deps: Vec<&String> = lines
+    let deps: Vec<&String> = lines
         .iter()
         .filter(|l| l.trim().starts_with("use "))
         .collect();
@@ -149,7 +146,7 @@ fn main() {
     if let Some(toon_output) = try_toon_compression(&json_input) {
         println!("Original Size: {} bytes", json_input.len());
         println!("TOON Size:     {} bytes\n", toon_output.len());
-        println!("{}\n", toon_output);
+        println!("{toon_output}\n");
     } else {
         println!("Failed to parse JSON for TOON compression.");
     }
@@ -161,7 +158,7 @@ fn main() {
     if let Some(toon_xml_output) = try_toon_compression(&xml_input) {
         println!("Original Size: {} bytes", xml_input.len());
         println!("TOON Size:     {} bytes\n", toon_xml_output.len());
-        println!("{}\n", toon_xml_output);
+        println!("{toon_xml_output}\n");
     } else {
         println!("Failed to parse XML for TOON compression.");
     }
@@ -173,5 +170,5 @@ fn main() {
     let latent_k_output = structural_extraction(&code_input);
     println!("Original Size: {} bytes", code_input.len());
     println!("Latent-K Size: {} bytes\n", latent_k_output.len());
-    println!("{}", latent_k_output);
+    println!("{latent_k_output}");
 }

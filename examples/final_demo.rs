@@ -1,9 +1,9 @@
-use std::collections::{HashMap, HashSet};
 use std::fs;
 
 use regex::Regex;
 
 // --- LATENT-K STRUCTURAL EXTRACTION ---
+#[allow(dead_code)]
 fn structural_extraction(original_input: &str) -> String {
     let mut lines = Vec::new();
     let mut in_block = false;
@@ -58,7 +58,7 @@ fn structural_extraction(original_input: &str) -> String {
     }
 
     let mut result = "[DEPENDENCY MAP (k=1)]\n".to_string();
-    let mut deps: Vec<&String> = lines
+    let deps: Vec<&String> = lines
         .iter()
         .filter(|l| l.trim().starts_with("use "))
         .collect();
@@ -94,14 +94,13 @@ fn flatten_json_to_toon(val: &serde_json::Value, out: &mut String, prefix: &str)
                 let new_prefix = if prefix.is_empty() {
                     k.clone()
                 } else {
-                    format!("{}.{}", prefix, k)
+                    format!("{prefix}.{k}")
                 };
                 if v.is_object() || v.is_array() {
                     flatten_json_to_toon(v, out, &new_prefix);
                 } else {
                     out.push_str(&format!(
-                        "{}:{} ",
-                        new_prefix,
+                        "{new_prefix}:{} ",
                         v.to_string().trim_matches('"')
                     ));
                 }
@@ -109,7 +108,7 @@ fn flatten_json_to_toon(val: &serde_json::Value, out: &mut String, prefix: &str)
         }
         serde_json::Value::Array(arr) => {
             // TOON Array Collapsing: "files[14]: a b c" instead of repeating keys
-            out.push_str(&format!("{}[{}]: ", prefix, arr.len()));
+            out.push_str(&format!("{prefix}[{}]: ", arr.len()));
             for v in arr {
                 if v.is_string() || v.is_number() || v.is_boolean() {
                     out.push_str(&format!("{} ", v.to_string().trim_matches('"')));
@@ -118,8 +117,7 @@ fn flatten_json_to_toon(val: &serde_json::Value, out: &mut String, prefix: &str)
         }
         _ => {
             out.push_str(&format!(
-                "{}:{} ",
-                prefix,
+                "{prefix}:{} ",
                 val.to_string().trim_matches('"')
             ));
         }
@@ -166,7 +164,7 @@ fn main() {
         "Compression:   {:.1}%\n",
         (1.0 - (json_toon.len() as f64 / json_input.len() as f64)) * 100.0
     );
-    println!("{}\n", json_toon);
+    println!("{json_toon}\n");
 
     println!("================================================================================");
     println!("🧪 TOON SQUEEZER: XML PAYLOAD");
@@ -179,7 +177,7 @@ fn main() {
         "Compression:   {:.1}%\n",
         (1.0 - (xml_toon.len() as f64 / xml_input.len() as f64)) * 100.0
     );
-    println!("{}\n", xml_toon);
+    println!("{xml_toon}\n");
 
     println!("================================================================================");
     println!("🧪 TOON SQUEEZER: HTML PAYLOAD");
@@ -192,5 +190,5 @@ fn main() {
         "Compression:   {:.1}%\n",
         (1.0 - (html_toon.len() as f64 / html_input.len() as f64)) * 100.0
     );
-    println!("{}\n", html_toon);
+    println!("{html_toon}\n");
 }

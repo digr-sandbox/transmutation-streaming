@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::Deserialize;
 
@@ -345,7 +345,7 @@ fn structural_extraction(original_input: &str) -> String {
                 lines.push(line.to_string());
             }
         }
-        depth = depth + open_braces as i32 - close_braces as i32;
+        depth = depth + (open_braces as i32) - (close_braces as i32);
         if depth <= 0 {
             depth = 0;
             in_structural = false;
@@ -384,7 +384,7 @@ async fn main() {
             } else {
                 log_squeezer(&tc.input)
             };
-            let comp_ratio = 1.0 - (output.len() as f64 / tc.input.len() as f64);
+            let comp_ratio = 1.0 - (f64::from(output.len() as u32) / f64::from(tc.input.len() as u32));
             let mut missed = Vec::new();
             for bit in &tc.important_bits {
                 if !output.to_lowercase().contains(&bit.to_lowercase()) {
@@ -394,7 +394,7 @@ async fn main() {
             let acc = if tc.important_bits.is_empty() {
                 100.0
             } else {
-                (tc.important_bits.len() - missed.len()) as f64 / tc.important_bits.len() as f64
+                (f64::from((tc.important_bits.len() - missed.len()) as u32) / f64::from(tc.important_bits.len() as u32))
                     * 100.0
             };
             let status = if acc >= 100.0 {
@@ -403,14 +403,12 @@ async fn main() {
             } else {
                 "\x1b[31mFAIL\x1b[0m"
             };
+            let in_size = tc.input.len();
+            let comp_percent = comp_ratio * 100.0;
+            let display_name = tc.name.chars().take(25).collect::<String>();
             println!(
-                "{:<15} | {:<25} | {:>8} | {:>7.1}% | {:.1}% {}",
-                tc.category,
-                tc.name.chars().take(25).collect::<String>(),
-                tc.input.len(),
-                comp_ratio * 100.0,
-                acc,
-                status
+                "{:<15} | {display_name:<25} | {in_size:>8} | {comp_percent:>7.1}% | {acc:.1}% {status}",
+                tc.category
             );
         }
     }
@@ -431,7 +429,7 @@ async fn main() {
             let needles = boring.extract_needles(&original, is_sql);
             total_tests += 1;
             let output = structural_extraction(&original);
-            let comp_ratio = 1.0 - (output.len() as f64 / original.len() as f64);
+            let comp_ratio = 1.0 - (f64::from(output.len() as u32) / f64::from(original.len() as u32));
             let mut missed = Vec::new();
             for n in &needles {
                 if !output.contains(n) {
@@ -441,7 +439,7 @@ async fn main() {
             let acc = if needles.is_empty() {
                 100.0
             } else {
-                (needles.len() - missed.len()) as f64 / needles.len() as f64 * 100.0
+                (f64::from((needles.len() - missed.len()) as u32) / f64::from(needles.len() as u32)) * 100.0
             };
             let status = if acc >= 100.0 {
                 passed_tests += 1;
@@ -449,17 +447,14 @@ async fn main() {
             } else {
                 "\x1b[31mFAIL\x1b[0m"
             };
+            let original_len = original.len();
+            let comp_percent = comp_ratio * 100.0;
             println!(
-                "{:<15} | {:<25} | {:>8} | {:>7.1}% | {:.1}% {}",
-                "Poly-Clean",
-                name,
-                original.len(),
-                comp_ratio * 100.0,
-                acc,
-                status
+                "{:<15} | {name:<25} | {original_len:>8} | {comp_percent:>7.1}% | {acc:.1}% {status}",
+                "Poly-Clean"
             );
             if acc < 100.0 {
-                println!("   ↳ Lost: {:?}", missed);
+                println!("   ↳ Lost: {missed:?}");
             }
             clean_needles.insert(name, needles);
         }
@@ -475,7 +470,7 @@ async fn main() {
                 total_tests += 1;
                 let original = fs::read_to_string(&path).unwrap_or_default();
                 let output = structural_extraction(&original);
-                let comp_ratio = 1.0 - (output.len() as f64 / original.len() as f64);
+                let comp_ratio = 1.0 - (f64::from(output.len() as u32) / f64::from(original.len() as u32));
                 let mut missed = Vec::new();
                 for n in needles {
                     if !output.contains(n) {
@@ -485,7 +480,7 @@ async fn main() {
                 let acc = if needles.is_empty() {
                     100.0
                 } else {
-                    (needles.len() - missed.len()) as f64 / needles.len() as f64 * 100.0
+                    (f64::from((needles.len() - missed.len()) as u32) / f64::from(needles.len() as u32)) * 100.0
                 };
                 let status = if acc >= 100.0 {
                     passed_tests += 1;
@@ -493,23 +488,19 @@ async fn main() {
                 } else {
                     "\x1b[31mFAIL\x1b[0m"
                 };
+                let original_len = original.len();
+                let comp_percent = comp_ratio * 100.0;
                 println!(
-                    "{:<15} | {:<25} | {:>8} | {:>7.1}% | {:.1}% {}",
-                    "Poly-Slop",
-                    filename,
-                    original.len(),
-                    comp_ratio * 100.0,
-                    acc,
-                    status
+                    "{:<15} | {filename:<25} | {original_len:>8} | {comp_percent:>7.1}% | {acc:.1}% {status}",
+                    "Poly-Slop"
                 );
                 if acc < 100.0 {
-                    println!("   ↳ Lost: {:?}", missed);
+                    println!("   ↳ Lost: {missed:?}");
                 }
             }
         }
     }
     println!(
-        "\n📊 FINAL SUMMARY: {}/{} total test cases passed.",
-        passed_tests, total_tests
+        "\n📊 FINAL SUMMARY: {passed_tests}/{total_tests} total test cases passed."
     );
 }

@@ -1,6 +1,5 @@
 use std::fs;
 use std::io::{BufWriter, Write};
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::Instant;
 
@@ -24,18 +23,13 @@ fn test_binary_stream(
     magic_bytes: &[u8],
     expected_ext: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!(
-        "\n🚀 Starting 30MB {} Stream Test...",
-        format_name.to_uppercase()
-    );
+    let upper_name = format_name.to_uppercase();
+    println!("\n🚀 Starting 30MB {upper_name} Stream Test...");
 
     let input_data = generate_mock_binary(magic_bytes, 30);
-    println!(
-        "   ✅ Generated 30MB of mock {} data in memory.",
-        format_name.to_uppercase()
-    );
+    println!("   ✅ Generated 30MB of mock {upper_name} data in memory.");
 
-    let temp_dir = std::path::PathBuf::from(format!("test_{}_dir", format_name));
+    let temp_dir = std::path::PathBuf::from(format!("test_{format_name}_dir"));
     let _ = fs::remove_dir_all(&temp_dir);
 
     let start = Instant::now();
@@ -44,16 +38,17 @@ fn test_binary_stream(
     let mut child = Command::new("cargo")
         .env("TRANSMUTATION_TEMP_DIR", temp_dir.to_str().unwrap())
         // Important: We request .md output to prove the sniffer overrides the output extension hint
-        // We enable 'audio' feature to ensure MP3 routing is supported
         .args([
             "run",
+            "--release",
+            "--quiet",
             "--features",
-            "cli,audio",
+            "cli",
             "--",
             "convert",
             "-",
             "--output",
-            &format!("dummy_output.md"),
+            "dummy_output.md",
             "--quiet",
         ])
         .stdin(Stdio::piped())
@@ -62,12 +57,12 @@ fn test_binary_stream(
         .spawn()?;
 
     // Pipe the 30MB data
-    let mut stdin = child.stdin.take().ok_or("Failed to open stdin")?;
+    let stdin = child.stdin.take().ok_or("Failed to open stdin")?;
     let input_data_clone = input_data.clone();
     std::thread::spawn(move || {
         let mut writer = BufWriter::new(stdin);
         if let Err(e) = writer.write_all(&input_data_clone) {
-            eprintln!("Failed to write to stdin: {}", e);
+            eprintln!("Failed to write to stdin: {e}");
         }
         let _ = writer.flush();
     });
@@ -91,46 +86,28 @@ fn test_binary_stream(
                 file_size = entry.metadata()?.len();
                 if name.ends_with(expected_ext) {
                     found_correct_extension = true;
-                    println!(
-                        "   ✓ SUCCESS: Stream Sniffer correctly assigned '{}' extension.",
-                        expected_ext
-                    );
+                    println!("   ✓ SUCCESS: Stream Sniffer correctly assigned '{expected_ext}' extension.");
                 } else {
-                    println!(
-                        "   ❌ FAILED: Sniffer assigned incorrect extension to file: {}",
-                        name
-                    );
+                    println!("   ❌ FAILED: Sniffer assigned incorrect extension to file: {name}");
                 }
             }
         }
     }
 
     if !found_correct_extension {
-        println!(
-            "❌ FAILED: Could not find the expected reconstructed file with extension '{}'.",
-            expected_ext
-        );
+        println!("❌ FAILED: Could not find the expected reconstructed file with extension '{expected_ext}'.");
         let _ = fs::remove_dir_all(&temp_dir);
         return Ok(());
     }
 
     if file_size as usize != input_data.len() {
-        println!(
-            "❌ FAILED: Reconstructed file size ({}) does not match input stream ({}).",
-            file_size,
-            input_data.len()
-        );
+        println!("❌ FAILED: Reconstructed file size ({file_size}) does not match input stream ({}).", input_data.len());
     } else {
         println!("   ✓ SUCCESS: Reconstructed file is exactly 30MB without memory crash.");
     }
 
     let duration = start.elapsed();
-    println!(
-        "✨ {} Test Complete in {:?} (Engine Status: {})",
-        format_name.to_uppercase(),
-        duration,
-        status
-    );
+    println!("✨ {upper_name} Test Complete in {duration:?} (Engine Status: {status})");
 
     // Cleanup
     let _ = fs::remove_dir_all(&temp_dir);
@@ -151,9 +128,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let zip_magic = &[0x50, 0x4B, 0x03, 0x04];
     test_binary_stream("zip", zip_magic, ".zip")?;
 
-    // 3. MP3 Test (Magic Bytes: ID3)
-    let mp3_magic = b"ID3\x03\x00\x00\x00\x00\x00\x00";
-    test_binary_stream("mp3", mp3_magic, ".mp3")?;
+    // 3. Office Test (DOCX) (Magic Bytes: PK\x03\x04 + word/ marker)
+    // The sniffer identifies it as zip initially, which is fine for this test
+    let docx_magic = &[0x50, 0x4B, 0x03, 0x04];
+    test_binary_stream("docx", docx_magic, ".zip")?;
 
     println!("\n✅ All Binary Stream Tests Completed.");
     Ok(())

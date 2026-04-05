@@ -34,11 +34,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "method": "initialize",
         "params": {}
     });
-    writeln!(stdin, "{}", init_req)?;
+    writeln!(stdin, "{init_req}")?;
 
     let mut line = String::new();
     reader.read_line(&mut line)?;
-    println!("  Result: {}", line.trim());
+    let trimmed = line.trim();
+    println!("  Result: {trimmed}");
     assert!(line.contains("transmutation-secure-proxy"));
 
     // 2.5 Send PING (MCP 2026 Liveness Check)
@@ -49,11 +50,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "method": "ping",
         "params": {}
     });
-    writeln!(stdin, "{}", ping_req)?;
+    writeln!(stdin, "{ping_req}")?;
 
     line.clear();
     reader.read_line(&mut line)?;
-    println!("  Result: {}", line.trim());
+    let trimmed = line.trim();
+    println!("  Result: {trimmed}");
     assert!(line.contains("\"result\":{}"));
 
     // 3. Send ALLOWED command (echo)
@@ -67,11 +69,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "arguments": { "command": "cmd /c echo stream-integrity-check" }
         }
     });
-    writeln!(stdin, "{}", call_req)?;
+    writeln!(stdin, "{call_req}")?;
 
     line.clear();
     reader.read_line(&mut line)?;
-    println!("  Result: {}", line.trim());
+    let trimmed = line.trim();
+    println!("  Result: {trimmed}");
     assert!(line.contains("stream-integrity-check"));
     assert!(line.contains("\"isError\":false"));
 
@@ -86,11 +89,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "arguments": { "command": "cat .env" }
         }
     });
-    writeln!(stdin, "{}", block_req)?;
+    writeln!(stdin, "{block_req}")?;
 
     line.clear();
     reader.read_line(&mut line)?;
-    println!("  Result: {}", line.trim());
+    let trimmed = line.trim();
+    println!("  Result: {trimmed}");
     assert!(line.contains("SECURITY BLOCKED"));
     assert!(line.contains("\"isError\":true"));
 
@@ -101,6 +105,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Kill the child gracefully
     drop(stdin);
     let _ = child.wait();
-
     Ok(())
 }

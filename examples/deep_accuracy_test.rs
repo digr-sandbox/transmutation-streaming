@@ -1,8 +1,5 @@
 use std::collections::HashSet;
 use std::fs;
-use std::path::Path;
-
-use regex::Regex;
 
 /// --- DEEP ACCURACY TEST RUNNER: Information Geometry & Mutation Engine ---
 /// This script validates token crushing across any language without hardcoded needles.
@@ -108,8 +105,7 @@ fn generate_noise(lines: usize) -> String {
     let mut out = String::new();
     for i in 0..lines {
         out.push_str(&format!(
-            "// JUNK_LICENSE_HEADER_LINE_{}: boilerplate text that means nothing to the agent\n",
-            i
+            "// JUNK_LICENSE_HEADER_LINE_{i}: boilerplate text that means nothing to the agent\n"
         ));
     }
     out
@@ -132,7 +128,7 @@ fn calculate_proximity_score(source: &str, crushed: &str, needles: &[String]) ->
     if needles.is_empty() {
         return 1.0;
     }
-    correct_order as f64 / needles.len() as f64
+    f64::from(correct_order) / needles.len() as f64
 }
 
 fn main() {
@@ -168,7 +164,7 @@ fn main() {
 
         // 2. Perform "Needle in a Haystack" Mutation
         let noise = generate_noise(1000);
-        let mutated_input = format!("{}\n{}\n{}", noise, original_content, noise);
+        let mutated_input = format!("{noise}\n{original_content}\n{noise}");
 
         // 3. ACTUAL UNIVERSAL CRUSHING (Production Logic)
         let output = structural_extraction(&mutated_input);
@@ -199,18 +195,15 @@ fn main() {
             "\x1b[31mFAIL\x1b[0m"
         };
 
+        let in_size = mutated_input.len();
+        let out_size = output.len();
+        let comp_percent = comp_ratio * 100.0;
         println!(
-            "{:<25} | {:>8} | {:>8} | {:>7.1}% | {:.1}% {}",
-            filename,
-            mutated_input.len(),
-            output.len(),
-            comp_ratio * 100.0,
-            cas,
-            status
+            "{filename:<25} | {in_size:>8} | {out_size:>8} | {comp_percent:>7.1}% | {cas:.1}% {status}"
         );
 
         if cas < 90.0 {
-            println!("   ↳ Lost Needles: {:?}", missed);
+            println!("   ↳ Lost Needles: {missed:?}");
         }
     }
 }

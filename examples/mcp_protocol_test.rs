@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "method": "initialize",
         "params": {}
     });
-    writeln!(stdin, "{}", init_req)?;
+    writeln!(stdin, "{init_req}")?;
 
     let mut line = String::new();
     reader.read_line(&mut line)?;
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "method": "tools/list",
         "params": {}
     });
-    writeln!(stdin, "{}", list_req)?;
+    writeln!(stdin, "{list_req}")?;
 
     line.clear();
     reader.read_line(&mut line)?;
@@ -67,7 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "method": "ping",
         "params": {}
     });
-    writeln!(stdin, "{}", ping_req)?;
+    writeln!(stdin, "{ping_req}")?;
 
     line.clear();
     reader.read_line(&mut line)?;
@@ -92,7 +92,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "arguments": { "command": "cmd /c echo protocol-verified" }
         }
     });
-    writeln!(stdin, "{}", exec_req)?;
+    writeln!(stdin, "{exec_req}")?;
 
     line.clear();
     reader.read_line(&mut line)?;

@@ -39,18 +39,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut passed = 0;
 
     for (cmd, rule) in &security_tests {
-        println!("\n🛡️  Testing Rule: {} | Command: '{}'", rule, cmd);
+        println!("\n🛡️  Testing Rule: {rule} | Command: '{cmd}'");
 
         let req = json!({
             "jsonrpc": "2.0",
-            "id": format!("test_{}", rule),
+            "id": format!("test_{rule}"),
             "method": "tools/call",
             "params": {
                 "name": "execute_secure_command",
                 "arguments": { "command": cmd }
             }
         });
-        writeln!(stdin, "{}", req)?;
+        writeln!(stdin, "{req}")?;
 
         let mut line = String::new();
         reader.read_line(&mut line)?;
@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             passed += 1;
         } else {
             println!("   ❌ FAILED to block or incorrect rule message.");
-            println!("      Response: {}", text);
+            println!("      Response: {text}");
         }
     }
 
@@ -75,7 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "method": "tools/call",
         "params": { "name": "execute_secure_command", "arguments": { "command": "cmd /c dir" } }
     });
-    writeln!(stdin, "{}", safe_req)?;
+    writeln!(stdin, "{safe_req}")?;
     let mut line = String::new();
     reader.read_line(&mut line)?;
     if line.contains("\"isError\":false") {
@@ -83,12 +83,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         passed += 1;
     }
 
-    println!(
-        "\n✨ SECURITY SUMMARY: {}/{} tests passed.",
-        passed,
-        security_tests.len() + 1
-    );
+    let total = security_tests.len() + 1;
+    println!("\n✨ SECURITY SUMMARY: {passed}/{total} tests passed.");
 
+    // Kill the child gracefully via scope
     drop(stdin);
     let _ = child.wait();
     Ok(())

@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use tempfile::Builder;
-use transmutation::{ConversionOptions, Converter, OutputFormat};
+use transmutation::{Converter, OutputFormat};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -24,10 +24,11 @@ It works perfectly!
     // Create a temporary file with a .txt extension
     let mut temp_file = Builder::new().suffix(".txt").tempfile()?;
 
-    write!(temp_file, "{}", input_text)?;
+    write!(temp_file, "{input_text}")?;
     let path = temp_file.path();
 
-    println!("Converting from temporary file: {}", path.display());
+    let display_path = path.display();
+    println!("Converting from temporary file: {display_path}");
 
     // Initialize converter
     let converter = Converter::new()?;
@@ -45,7 +46,8 @@ It works perfectly!
     // Output the result
     println!("\n--- CONVERTED OUTPUT ---");
     for chunk in result.content {
-        println!("{}", String::from_utf8_lossy(&chunk.data));
+        let content = String::from_utf8_lossy(&chunk.data);
+        println!("{content}");
     }
 
     Ok(())

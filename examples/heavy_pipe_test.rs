@@ -37,9 +37,9 @@ fn semantic_squeeze_v11(text: &str) -> (String, String) {
             let original = mat.as_str().to_string();
             let occurrences = result.matches(&original).count();
             if occurrences > 3 && original.len() > 8 && !legend.contains_key(&original) {
-                let alias = format!("@{}", alias_idx);
+                let alias = format!("@{alias_idx}");
                 legend.insert(original.clone(), alias.clone());
-                legend_str.push_str(&format!("{}:{} ", alias, original));
+                legend_str.push_str(&format!("{alias}:{original} "));
                 alias_idx += 1;
             }
         }
@@ -125,7 +125,7 @@ fn run_compression(input: &str, config: &Config) -> (String, String, f64) {
         }
 
         let count = freq_map.get(word).unwrap_or(&1);
-        let idf = (total / *count as f64).ln();
+        let idf = (total / f64::from(*count)).ln();
         let pos = if stop_words.contains(word.to_lowercase().as_str()) {
             -10.0
         } else {
@@ -139,7 +139,7 @@ fn run_compression(input: &str, config: &Config) -> (String, String, f64) {
         }
     }
 
-    let final_output = format!("# LEGEND: {} ---\n{}", legend, body.trim());
+    let final_output = format!("# LEGEND: {legend} ---\n{}", body.trim());
     let savings = 1.0 - (final_output.len() as f64 / input.len() as f64);
     (final_output, legend, savings)
 }
@@ -151,7 +151,7 @@ fn main() {
     for i in 0..1000 {
         heavy_log.push_str(&format!("[2026-04-01 12:00:{:02}] INFO 192.168.1.{} GET /api/v1/users/{} status=200 latency={}ms\n", 
             i % 60, i % 255, i, 10 + (i % 100)));
-        heavy_log.push_str(&format!("[2026-04-01 12:00:{:02}] ERROR 192.168.1.{} POST /api/v1/login failed reason=timeout\n",
+        heavy_log.push_str(&format!("[2026-04-01 12:00:{:02}] ERROR 192.168.1.{} POST /api/v1/login failed reason=timeout\n", 
             i % 60, i % 255));
     }
 
@@ -167,8 +167,9 @@ fn main() {
 
     println!("Input Size:  {} bytes", heavy_log.len());
     println!("Output Size: {} bytes", output.len());
-    println!("Compression: {:.1}%", savings * 100.0);
-    println!("Duration:    {:?}", duration);
+    let savings_percent = savings * 100.0;
+    println!("Compression: {savings_percent:.1}%");
+    println!("Duration:    {duration:?}");
 
     // Accuracy Check
     let mut pass = true;
@@ -176,7 +177,7 @@ fn main() {
         if !output.to_lowercase().contains(&check.to_lowercase())
             && !legend.to_lowercase().contains(&check.to_lowercase())
         {
-            println!("❌ ACCURACY FAILURE: Missing critical signal '{}'", check);
+            println!("❌ ACCURACY FAILURE: Missing critical signal '{check}'");
             pass = false;
         }
     }
