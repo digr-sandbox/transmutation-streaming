@@ -86,7 +86,9 @@ fn test_binary_stream(
                 file_size = entry.metadata()?.len();
                 if name.ends_with(expected_ext) {
                     found_correct_extension = true;
-                    println!("   ✓ SUCCESS: Stream Sniffer correctly assigned '{expected_ext}' extension.");
+                    println!(
+                        "   ✓ SUCCESS: Stream Sniffer correctly assigned '{expected_ext}' extension."
+                    );
                 } else {
                     println!("   ❌ FAILED: Sniffer assigned incorrect extension to file: {name}");
                 }
@@ -95,13 +97,18 @@ fn test_binary_stream(
     }
 
     if !found_correct_extension {
-        println!("❌ FAILED: Could not find the expected reconstructed file with extension '{expected_ext}'.");
+        println!(
+            "❌ FAILED: Could not find the expected reconstructed file with extension '{expected_ext}'."
+        );
         let _ = fs::remove_dir_all(&temp_dir);
         return Ok(());
     }
 
     if file_size as usize != input_data.len() {
-        println!("❌ FAILED: Reconstructed file size ({file_size}) does not match input stream ({}).", input_data.len());
+        println!(
+            "❌ FAILED: Reconstructed file size ({file_size}) does not match input stream ({}).",
+            input_data.len()
+        );
     } else {
         println!("   ✓ SUCCESS: Reconstructed file is exactly 30MB without memory crash.");
     }

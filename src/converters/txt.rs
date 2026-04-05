@@ -104,8 +104,8 @@ impl DocumentConverter for TxtConverter {
                 markdown.push_str("# Document\n\n");
 
                 use std::io::BufRead;
-                let file = std::fs::File::open(input)
-                    .map_err(crate::TransmutationError::IoError)?;
+                let file =
+                    std::fs::File::open(input).map_err(crate::TransmutationError::IoError)?;
                 let reader = std::io::BufReader::new(file);
 
                 let mut in_paragraph = false;

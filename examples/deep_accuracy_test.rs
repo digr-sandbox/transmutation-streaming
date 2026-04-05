@@ -3,7 +3,6 @@ use std::fs;
 
 /// --- DEEP ACCURACY TEST RUNNER: Information Geometry & Mutation Engine ---
 /// This script validates token crushing across any language without hardcoded needles.
-
 struct BoringTable {
     tokens: HashSet<&'static str>,
 }
@@ -111,7 +110,7 @@ fn generate_noise(lines: usize) -> String {
     out
 }
 
-fn calculate_proximity_score(source: &str, crushed: &str, needles: &[String]) -> f64 {
+fn calculate_proximity_score(_source: &str, crushed: &str, needles: &[String]) -> f64 {
     // Simplified proximity check: Do the needles appear in the same relative order?
     let mut last_idx = 0;
     let mut correct_order = 0;
@@ -147,7 +146,7 @@ fn main() {
 
     for entry in assets.filter_map(|e| e.ok()) {
         let path = entry.path();
-        if path.extension().map_or(true, |ext| ext == "json") {
+        if path.extension().is_none_or(|ext| ext == "json") {
             continue;
         }
 

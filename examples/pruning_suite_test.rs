@@ -384,7 +384,8 @@ async fn main() {
             } else {
                 log_squeezer(&tc.input)
             };
-            let comp_ratio = 1.0 - (f64::from(output.len() as u32) / f64::from(tc.input.len() as u32));
+            let comp_ratio =
+                1.0 - (f64::from(output.len() as u32) / f64::from(tc.input.len() as u32));
             let mut missed = Vec::new();
             for bit in &tc.important_bits {
                 if !output.to_lowercase().contains(&bit.to_lowercase()) {
@@ -394,7 +395,8 @@ async fn main() {
             let acc = if tc.important_bits.is_empty() {
                 100.0
             } else {
-                (f64::from((tc.important_bits.len() - missed.len()) as u32) / f64::from(tc.important_bits.len() as u32))
+                (f64::from((tc.important_bits.len() - missed.len()) as u32)
+                    / f64::from(tc.important_bits.len() as u32))
                     * 100.0
             };
             let status = if acc >= 100.0 {
@@ -429,7 +431,8 @@ async fn main() {
             let needles = boring.extract_needles(&original, is_sql);
             total_tests += 1;
             let output = structural_extraction(&original);
-            let comp_ratio = 1.0 - (f64::from(output.len() as u32) / f64::from(original.len() as u32));
+            let comp_ratio =
+                1.0 - (f64::from(output.len() as u32) / f64::from(original.len() as u32));
             let mut missed = Vec::new();
             for n in &needles {
                 if !output.contains(n) {
@@ -439,7 +442,8 @@ async fn main() {
             let acc = if needles.is_empty() {
                 100.0
             } else {
-                (f64::from((needles.len() - missed.len()) as u32) / f64::from(needles.len() as u32)) * 100.0
+                (f64::from((needles.len() - missed.len()) as u32) / f64::from(needles.len() as u32))
+                    * 100.0
             };
             let status = if acc >= 100.0 {
                 passed_tests += 1;
@@ -470,7 +474,8 @@ async fn main() {
                 total_tests += 1;
                 let original = fs::read_to_string(&path).unwrap_or_default();
                 let output = structural_extraction(&original);
-                let comp_ratio = 1.0 - (f64::from(output.len() as u32) / f64::from(original.len() as u32));
+                let comp_ratio =
+                    1.0 - (f64::from(output.len() as u32) / f64::from(original.len() as u32));
                 let mut missed = Vec::new();
                 for n in needles {
                     if !output.contains(n) {
@@ -480,7 +485,9 @@ async fn main() {
                 let acc = if needles.is_empty() {
                     100.0
                 } else {
-                    (f64::from((needles.len() - missed.len()) as u32) / f64::from(needles.len() as u32)) * 100.0
+                    (f64::from((needles.len() - missed.len()) as u32)
+                        / f64::from(needles.len() as u32))
+                        * 100.0
                 };
                 let status = if acc >= 100.0 {
                     passed_tests += 1;
@@ -500,7 +507,5 @@ async fn main() {
             }
         }
     }
-    println!(
-        "\n📊 FINAL SUMMARY: {passed_tests}/{total_tests} total test cases passed."
-    );
+    println!("\n📊 FINAL SUMMARY: {passed_tests}/{total_tests} total test cases passed.");
 }

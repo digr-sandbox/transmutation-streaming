@@ -221,7 +221,7 @@ async fn fetch_from_daemon(
     payload: Value,
 ) -> Result<DaemonResponse, Box<dyn std::error::Error>> {
     let res = client
-        .post(format!("{}/{}", DAEMON_URL, endpoint))
+        .post(format!("{DAEMON_URL}/{endpoint}"))
         .json(&payload)
         .send()
         .await?;
@@ -242,7 +242,7 @@ async fn forward_to_daemon(
     tool_name: &str,
 ) -> Result<DaemonResponse, Box<dyn std::error::Error>> {
     let res = client
-        .post(format!("{}/execute", DAEMON_URL))
+        .post(format!("{DAEMON_URL}/execute"))
         .json(&json!({ "command": command, "tool_name": tool_name }))
         .send()
         .await?;
@@ -264,13 +264,15 @@ async fn ensure_daemon_running(client: &Client) -> Result<(), Box<dyn std::error
     let mut sys = System::new();
     sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
     for process in sys.processes_by_exact_name(std::ffi::OsStr::new(DAEMON_BIN)) {
-        tracing::warn!("Killing hung daemon process: {}", process.pid());
+        let pid = process.pid();
+        tracing::warn!("Killing hung daemon process: {pid}");
         process.kill();
     }
     // Also try with .exe for Windows
-    let bin_exe = format!("{}.exe", DAEMON_BIN);
+    let bin_exe = format!("{DAEMON_BIN}.exe");
     for process in sys.processes_by_exact_name(std::ffi::OsStr::new(&bin_exe)) {
-        tracing::warn!("Killing hung daemon process: {}", process.pid());
+        let pid = process.pid();
+        tracing::warn!("Killing hung daemon process: {pid}");
         process.kill();
     }
 
@@ -283,7 +285,8 @@ async fn ensure_daemon_running(client: &Client) -> Result<(), Box<dyn std::error
     let daemon_name = format!("{}{}", DAEMON_BIN, std::env::consts::EXE_SUFFIX);
     let daemon_path = current_exe.parent().unwrap().join(daemon_name);
 
-    tracing::info!("Spawning new daemon from: {}", daemon_path.display());
+    let display_path = daemon_path.display();
+    tracing::info!("Spawning new daemon from: {display_path}");
 
     tokio::process::Command::new(&daemon_path)
         .stdout(std::process::Stdio::null())
@@ -307,7 +310,7 @@ async fn ensure_daemon_running(client: &Client) -> Result<(), Box<dyn std::error
 
 async fn is_daemon_healthy(client: &Client) -> bool {
     match client
-        .get(format!("{}/health", DAEMON_URL))
+        .get(format!("{DAEMON_URL}/health"))
         .timeout(Duration::from_millis(500))
         .send()
         .await

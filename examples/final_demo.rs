@@ -116,10 +116,7 @@ fn flatten_json_to_toon(val: &serde_json::Value, out: &mut String, prefix: &str)
             }
         }
         _ => {
-            out.push_str(&format!(
-                "{prefix}:{} ",
-                val.to_string().trim_matches('"')
-            ));
+            out.push_str(&format!("{prefix}:{} ", val.to_string().trim_matches('"')));
         }
     }
 }

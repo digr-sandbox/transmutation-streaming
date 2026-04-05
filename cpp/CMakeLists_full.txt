@@ -19,16 +19,13 @@ if(NOT DOCLING_BUILD_DIR)
 endif()
 message(STATUS "Using docling-parse build directory: ${DOCLING_BUILD_DIR}")
 
-# Find docling-parse static libraries
-set(PARSE_V1_LIB "${DOCLING_BUILD_DIR}/libparse_v1.a")
-set(PARSE_V2_LIB "${DOCLING_BUILD_DIR}/libparse_v2.a")
+# Find docling-parse static library
+# Note: Newer versions use a single libparse.a
+set(PARSE_LIB "${DOCLING_BUILD_DIR}/libparse.a")
 
-# Verify libraries exist
-if(NOT EXISTS "${PARSE_V1_LIB}")
-    message(FATAL_ERROR "libparse_v1.a not found at ${PARSE_V1_LIB}")
-endif()
-if(NOT EXISTS "${PARSE_V2_LIB}")
-    message(FATAL_ERROR "libparse_v2.a not found at ${PARSE_V2_LIB}")
+# Verify library exists
+if(NOT EXISTS "${PARSE_LIB}")
+    message(FATAL_ERROR "libparse.a not found at ${PARSE_LIB}")
 endif()
 
 # Find external dependencies (all built as part of docling-parse)
@@ -64,8 +61,7 @@ target_include_directories(docling_ffi PRIVATE
 
 # Link libraries
 target_link_libraries(docling_ffi PRIVATE
-    ${PARSE_V1_LIB}
-    ${PARSE_V2_LIB}
+    ${PARSE_LIB}
     ${QPDF_LIB}
     ${JPEG_LIB}
     ${LOGURU_LIB}
