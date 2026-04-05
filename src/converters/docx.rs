@@ -206,24 +206,6 @@ impl DocumentConverter for DocxConverter {
                     ));
                 }
             }
-            OutputFormat::Image {
-                format: _format,
-                quality: _quality,
-                dpi: _dpi,
-            } => {
-                #[cfg(feature = "pdf-to-image")]
-                {
-                    self.convert_to_images(input, _format, _quality, _dpi, &options)
-                        .await?
-                }
-                #[cfg(not(feature = "pdf-to-image"))]
-                {
-                    return Err(crate::TransmutationError::InvalidOptions(
-                        "DOCX to image requires pdf-to-image feature (uses LibreOffice + pdftoppm)"
-                            .to_string(),
-                    ));
-                }
-            }
             _ => {
                 return Err(crate::TransmutationError::InvalidOptions(format!(
                     "Unsupported output format for DOCX: {:?}",

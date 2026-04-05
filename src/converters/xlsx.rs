@@ -21,7 +21,7 @@ use crate::types::{
 
 /// XLSX to multiple formats converter
 ///
-/// Uses umya-spreadsheet for direct parsing (pure Rust, no LibreOffice)
+/// Uses umya-spreadsheet for direct parsing (pure Rust)
 #[derive(Debug)]
 pub struct XlsxConverter;
 
@@ -277,7 +277,7 @@ impl DocumentConverter for XlsxConverter {
             name: "XLSX Converter".to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
             description:
-                "XLSX to Markdown/CSV/JSON/XML converter (pure Rust, no LibreOffice needed)"
+                "XLSX to Markdown/CSV/JSON/XML converter (pure Rust)"
                     .to_string(),
             external_deps: vec![],
         }

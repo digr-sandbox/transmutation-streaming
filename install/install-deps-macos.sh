@@ -10,31 +10,23 @@ echo ""
 
 # Check if Homebrew is installed
 if ! command -v brew &> /dev/null; then
-    echo "❌ Homebrew not found!"
-    echo ""
-    echo "Install Homebrew first:"
-    echo "  /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-    echo ""
+    echo "❌ Homebrew not found. Please install it first from https://brew.sh/"
     exit 1
 fi
 
-echo "📥 Installing ALL dependencies for ALL features via Homebrew..."
+echo "📥 Installing ALL dependencies..."
 echo ""
 
-# Core build tools (usually pre-installed on macOS with Xcode Command Line Tools)
-echo "[1/6] Checking Xcode Command Line Tools..."
-xcode-select -p &> /dev/null || xcode-select --install
+# Core tools
+echo "[1/3] Installing build tools..."
+brew install cmake pkg-config
 
-# PDF & Image conversion
-echo "[2/6] Installing poppler (PDF → Image)..."
+# PDF support
+echo "[2/3] Installing poppler (PDF processing)..."
 brew install poppler
 
-# Office conversion
-echo "[3/6] Installing LibreOffice (Office formats)..."
-brew install --cask libreoffice
-
 # OCR support
-echo "[4/4] Installing Tesseract (OCR for images)..."
+echo "[3/3] Installing Tesseract (OCR for images)..."
 brew install tesseract tesseract-lang
 
 echo ""
@@ -43,7 +35,6 @@ echo ""
 echo "📊 Installed tools:"
 echo "  - Xcode tools: $(xcode-select -p)"
 echo "  - pdftoppm: $(pdftoppm -v 2>&1 | head -1)"
-echo "  - LibreOffice: /Applications/LibreOffice.app"
 echo "  - Tesseract: $(tesseract --version | head -1)"
 echo ""
 echo "🚀 You can now run:"
@@ -51,4 +42,3 @@ echo "   transmutation convert document.pdf --format png"
 echo "   transmutation convert document.docx -o output.md"
 echo "   transmutation convert image.jpg -o ocr.md        # OCR"
 echo ""
-

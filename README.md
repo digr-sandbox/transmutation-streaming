@@ -27,7 +27,7 @@ If you prefer to build from source, run this single command (requires Rust):
 git clone https://github.com/hivellm/transmutation.git && cd transmutation
 cargo build --release --features full
 ```
-*(Transmutation is **Zero-Python** and **Zero-LibreOffice**. Only Tesseract is required for the optional `image-ocr` feature).*
+*(Transmutation is **Zero-Python**. Only Tesseract is required for the optional `image-ocr` feature).*
 
 ### 2. Connect your Agent (MCP)
 Add Transmutation to your `claude.json` or `mcp.json`:

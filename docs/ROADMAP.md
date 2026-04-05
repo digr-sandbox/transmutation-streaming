@@ -12,8 +12,6 @@ This roadmap outlines the development plan for Transmutation, a high-performance
 - ✅ **Phase 3**: Advanced Features (COMPLETE - Archives ✅, Batch ✅, OCR ✅)
 - 📝 **Phase 4**: Advanced Optimizations & v1.0.0
 
-**Latest Achievement**: Achieved 100% Zero-Python architecture and removed all heavy system dependencies (LibreOffice, FFmpeg, Whisper).
-
 **Scope**: Pure Rust library/CLI for document conversion and secure agentic gateway.
 
 **Overall Progress**: 

@@ -1,212 +1,100 @@
 # Transmutation Installation Guide
 
-## Quick Start
+Transmutation is a high-performance, pure Rust gateway for AI agents. It is designed to be lightweight and requires minimal system dependencies.
+
+## 📋 Prerequisites
+
+*   **Rust Nightly**: Required for building from source (`rustup toolchain install nightly`).
+*   **Tesseract OCR** (Optional): Only needed if you want to extract text from images.
+*   **Poppler** (Optional): Only needed if you want to render PDF pages to images.
+
+---
+
+## 🚀 Quick Install (Automated)
+
+Transmutation provides automated dependency installers for all major platforms. These scripts install the necessary build tools and optional runtime dependencies.
 
 ### Linux (Debian/Ubuntu)
-
 ```bash
-# Install dependencies
 chmod +x install/install-deps-linux.sh
 ./install/install-deps-linux.sh
-
-# Or manually:
-sudo apt-get update
-sudo apt-get install -y poppler-utils libreoffice
 ```
 
-### macOS
-
+### macOS (Homebrew)
 ```bash
-# Install dependencies
 chmod +x install/install-deps-macos.sh
 ./install/install-deps-macos.sh
-
-# Or manually:
-brew install poppler
-brew install --cask libreoffice
 ```
 
-### Windows
-
-**Option 1: PowerShell + Chocolatey (Recommended)**
+### Windows (PowerShell + Chocolatey)
 ```powershell
-# Run as Administrator
 .\install\install-deps-windows.ps1
 ```
 
-**Option 2: Batch + winget (Windows 10/11)**
-```batch
-REM Run as Administrator
-.\install\install-deps-windows.bat
-```
-
-**Option 3: Manual Download (No package manager)**
-```batch
-REM Run as Administrator
-.\install\install-deps-windows-manual.bat
-```
-
-**Manual installation:**
-```powershell
-# With Chocolatey
-choco install poppler libreoffice tesseract ffmpeg -y
-
-# With winget
-winget install TheDocumentFoundation.LibreOffice
-winget install UB-Mannheim.TesseractOCR
-winget install Gyan.FFmpeg
-```
-
 ---
 
-## Dependencies
+## 🏗️ Building from Source
 
-Transmutation uses external tools for certain conversions:
-
-| Tool | Purpose | Linux | macOS | Windows |
-|------|---------|-------|-------|---------|
-| **Build Tools** | Compile C++/FFI | `apt install build-essential cmake` | Xcode Command Line Tools | VS Build Tools 2022 |
-| **poppler-utils** | PDF → Image | `apt install poppler-utils` | `brew install poppler` | `choco install poppler` or winget |
-| **LibreOffice** | DOCX → PDF → Image | `apt install libreoffice` | `brew install --cask libreoffice` | `choco install libreoffice` or winget |
-| **Tesseract** | OCR for images | `apt install tesseract-ocr` | `brew install tesseract` | `choco install tesseract` or winget |
-| **FFmpeg** | Audio/Video → Text | `apt install ffmpeg` | `brew install ffmpeg` | `choco install ffmpeg` or winget |
-
-### Why External Dependencies?
-
-**LibreOffice (DOCX → Image):**
-- DOCX is a text format without fixed visual layout
-- Rendering requires a layout engine (Word, LibreOffice, Google Docs)
-- Docling uses the same approach (Pandoc or LibreOffice subprocess)
-- No pure Rust library exists for DOCX rendering
-
-**Poppler/pdftoppm (PDF → Image):**
-- Industry-standard PDF rendering
-- Fast and reliable
-- Used by Docling, ImageMagick, and many others
-- Alternative: Could use pdfium-render (requires libpdfium.so)
-
----
-
-## Feature Matrix
-
-| Feature | Dependencies | Pure Rust | Feature Flag |
-|---------|--------------|-----------|--------------|
-| **PDF → Markdown** | ✅ None | ✅ 100% Rust | `pdf` |
-| **PDF → Images** | ⚠️ poppler-utils | ❌ | `pdf-to-image` |
-| **DOCX → Markdown** | ✅ None | ✅ 100% Rust | `office` |
-| **DOCX → Images** | ⚠️ LibreOffice + poppler | ❌ | `office,pdf-to-image` |
-| **XLSX → Markdown** | ✅ None | ✅ 100% Rust | `office` |
-| **PPTX → Markdown** | ✅ None | ✅ 100% Rust | `office` |
-| **Image OCR** | ⚠️ Tesseract | ✅ Rust bindings | `tesseract` |
-| **Audio → Text** | ⚠️ FFmpeg | ✅ Rust bindings | `audio` |
-| **Video → Text** | ⚠️ FFmpeg | ✅ Rust bindings | `video` |
-| **Split Pages (MD)** | ✅ None | ✅ 100% Rust | All |
-| **Archives (ZIP/TAR)** | ✅ None | ✅ 100% Rust | `archives` |
-| **HTML/XML** | ✅ None | ✅ 100% Rust | `web` |
-
----
-
-## Building with Specific Features
-
-You can compile Transmutation with only the features you need:
+Once dependencies are installed, you can build the release binaries:
 
 ```bash
-# Minimal build (PDF + Office only)
-cargo build --release --features "pdf,office"
-
-# Full build (all features)
-cargo build --release --features "pdf,pdf-to-image,office,web,tesseract,audio,video,archives,cli"
-
-# Without external dependencies (pure Rust only)
-cargo build --release --features "pdf,office,web,archives,cli"
-
-# With OCR support
-cargo build --release --features "pdf,office,tesseract,cli"
+# Build with core features
+cargo build --release --features cli,office
 ```
 
-### Feature Dependencies
-
-| Feature | Requires External Tools |
-|---------|------------------------|
-| `pdf` | ❌ Pure Rust |
-| `pdf-to-image` | ✅ poppler-utils |
-| `office` | ❌ Pure Rust (MD), ✅ LibreOffice (Images) |
-| `web` | ❌ Pure Rust |
-| `tesseract` | ✅ Tesseract OCR |
-| `audio` | ✅ FFmpeg |
-| `video` | ✅ FFmpeg |
-| `archives` | ❌ Pure Rust |
-| `docling-ffi` | ✅ C++ build tools, docling-parse |
+The resulting binaries will be in `target/release/`:
+*   `transmutation`: The main CLI tool.
+*   `transmutation-mcp-proxy`: The Model Context Protocol (MCP) gateway.
 
 ---
 
-## Verification
+## 📋 Feature Matrix (v0.3.2+)
 
-After installation, verify:
+Transmutation achieves **Zero-Python** status for all core document formats.
+
+| Feature | System Dependency | Pure Rust | Feature Flag |
+|---------|-------------------|-----------|--------------|
+| **PDF → Markdown** | None | ✅ 100% Rust | (Always enabled) |
+| **PDF → Images** | Poppler | ❌ | `pdf-to-image` |
+| **DOCX → Markdown**| None | ✅ 100% Rust | `office` |
+| **XLSX → Markdown**| None | ✅ 100% Rust | `office` |
+| **PPTX → Markdown**| None | ✅ 100% Rust | `office` |
+| **Image OCR** | Tesseract | ✅ Bindings | `image-ocr` |
+| **Archives (ZIP)** | None | ✅ 100% Rust | (Always enabled) |
+| **HTML/XML** | None | ✅ 100% Rust | (Always enabled) |
+
+---
+
+## 🛡️ Verification
+
+After installation, verify the tools are available in your path:
 
 ```bash
-# Check poppler
+# Check Transmutation
+./target/release/transmutation --version
+
+# Check Tesseract (if installed)
+tesseract --version
+
+# Check Poppler (if installed)
 pdftoppm -v
-
-# Check LibreOffice
-libreoffice --version
-
-# Windows
-pdftoppm.exe -v
-soffice.exe --version
 ```
 
 ---
 
-## Platform-Specific Notes
+## 🐳 Docker Deployment
 
-### Linux
-- **Ubuntu/Debian**: Use `apt-get` (tested on Ubuntu 24.04)
-- **Fedora/RHEL**: Use `dnf install poppler-utils libreoffice`
-- **Arch**: Use `pacman -S poppler libreoffice`
-
-### macOS
-- Requires Homebrew
-- LibreOffice installs to `/Applications/LibreOffice.app`
-- poppler installs to `/opt/homebrew/bin/pdftoppm`
-
-### Windows
-- Requires Chocolatey
-- Must run PowerShell as Administrator
-- poppler installs to `C:\ProgramData\chocolatey\bin\`
-- LibreOffice installs to `C:\Program Files\LibreOffice\`
-
----
-
-## Troubleshooting
-
-### "Command not found: pdftoppm"
-Install poppler-utils for your platform (see above)
-
-### "Command not found: libreoffice/soffice"
-Install LibreOffice for your platform (see above)
-
-### Windows: "execution policy" error
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
-
----
-
-## Optional: Docker
-
-Don't want to install dependencies? Use Docker:
+For a fully isolated, zero-dependency environment, use Docker:
 
 ```bash
-# Build Docker image with all dependencies
+# Build the image
 docker build -t transmutation .
 
-# Run
-docker run -v $(pwd)/data:/data transmutation convert /data/document.pdf
+# Run a conversion
+docker run -v $(pwd)/data:/app/data transmutation convert /app/data/doc.pdf
 ```
 
 ---
 
-**Last Updated**: October 13, 2025  
+**Last Updated**: April 4, 2026  
 **Supported Platforms**: Linux, macOS, Windows
-

@@ -205,17 +205,6 @@ fn check_external_dependencies() {
     #[allow(unused_mut)]
     let mut warnings: Vec<(&str, &str, String)> = Vec::new();
 
-    // Check pdf-to-image feature dependencies
-    #[cfg(feature = "pdf-to-image")]
-    {
-        if !command_exists("pdftoppm") {
-            warnings.push((
-                "pdftoppm (poppler-utils)",
-                "PDF → Image conversion",
-                get_install_command("poppler-utils"),
-            ));
-        }
-    }
     // Check tesseract feature dependencies
     #[cfg(feature = "tesseract")]
     {
@@ -271,7 +260,6 @@ fn get_install_command(tool: &str) -> String {
     #[cfg(target_os = "linux")]
     {
         match tool {
-            "poppler-utils" => "sudo apt-get install poppler-utils".to_string(),
             "tesseract" => "sudo apt-get install tesseract-ocr".to_string(),
             _ => format!("sudo apt-get install {tool}"),
         }
@@ -280,7 +268,6 @@ fn get_install_command(tool: &str) -> String {
     #[cfg(target_os = "macos")]
     {
         match tool {
-            "poppler-utils" => "brew install poppler".to_string(),
             "tesseract" => "brew install tesseract".to_string(),
             _ => format!("brew install {tool}"),
         }
@@ -289,7 +276,6 @@ fn get_install_command(tool: &str) -> String {
     #[cfg(target_os = "windows")]
     {
         match tool {
-            "poppler-utils" => "choco install poppler".to_string(),
             "tesseract" => "choco install tesseract".to_string(),
             _ => format!("choco install {tool}"),
         }

@@ -19,7 +19,7 @@ For structured formats (JSON, XML, HTML, and Office Docs), statistical pruning w
 *   **Tag Stripping**: For HTML/XML, it removes all closing tags and simplifies opening tags to attribute lists.
 
 ### Pure Rust Office Transmutation
-Unlike traditional converters that require LibreOffice or Pandoc, Transmutation achieves **zero-dependency Office conversion**:
+Transmutation achieves **zero-dependency Office conversion**:
 1.  **ZIP Extraction**: DOCX, XLSX, and PPTX are unzipped in-memory (or spooled to disk for large files).
 2.  **XML Squeezing**: The internal `word/document.xml` or `xl/worksheets/sheet1.xml` is passed directly to the TOON engine.
 3.  **Semantic Mapping**:

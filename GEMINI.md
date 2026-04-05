@@ -11,7 +11,7 @@
 
 ### Prerequisites
 - **Rust Toolchain**: Nightly 1.85+ (`rustup toolchain install nightly`)
-- **System Dependencies**: Some features require external tools (Tesseract, Poppler, LibreOffice). Use scripts in `install/` to set them up.
+- **System Dependencies**: Some features require external tools (Tesseract, Poppler). Use scripts in `install/` to set them up.
 
 ### Key Commands
 - **Build**: `cargo build --release` (standard) or `cargo build --features full` (all features).

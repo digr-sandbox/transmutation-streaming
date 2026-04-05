@@ -4,9 +4,7 @@
   
   This installer can optionally install external dependencies:
   - Poppler (pdftoppm)
-  - LibreOffice
   - Tesseract OCR
-  - FFmpeg
 -->
 
 <Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
@@ -55,28 +53,16 @@
       <RegistrySearch Id='PopplerReg' Root='HKLM' Key='SOFTWARE\Poppler' Type='raw' />
     </Property>
 
-    <Property Id='LIBREOFFICE_INSTALLED'>
-      <DirectorySearch Id='LibreOfficeSearch' Path='C:\Program Files\LibreOffice'>
-        <FileSearch Name='soffice.exe' />
-      </DirectorySearch>
-    </Property>
-
     <Property Id='TESSERACT_INSTALLED'>
       <DirectorySearch Id='TesseractSearch' Path='C:\Program Files\Tesseract-OCR'>
         <FileSearch Name='tesseract.exe' />
       </DirectorySearch>
     </Property>
 
-    <Property Id='FFMPEG_INSTALLED'>
-      <RegistrySearch Id='FFmpegReg' Root='HKLM' Key='SOFTWARE\FFmpeg' Type='raw' />
-    </Property>
-
     <!-- Properties to control what gets installed -->
     <Property Id='INSTALL_DEPENDENCIES' Value='1' />
     <Property Id='INSTALL_POPPLER' Value='1' />
-    <Property Id='INSTALL_LIBREOFFICE' Value='1' />
     <Property Id='INSTALL_TESSERACT' Value='1' />
-    <Property Id='INSTALL_FFMPEG' Value='1' />
 
     <Directory Id='TARGETDIR' Name='SourceDir'>
       <Directory Id='ProgramFiles64Folder'>
@@ -162,7 +148,7 @@
     <CustomAction
       Id='InstallDepsChoco'
       Directory='TARGETDIR'
-      ExeCommand='cmd.exe /c "choco install poppler libreoffice tesseract ffmpeg -y"'
+      ExeCommand='cmd.exe /c "choco install poppler tesseract -y"'
       Execute='deferred'
       Impersonate='no'
       Return='ignore' />
@@ -220,7 +206,7 @@
       <Feature
         Id='Dependencies'
         Title='External Dependencies'
-        Description='Install external tools (Poppler, LibreOffice, Tesseract, FFmpeg) for advanced features'
+        Description='Install external tools (Poppler, Tesseract) for advanced features'
         Level='2'>
         
         <Condition Level='1'>
