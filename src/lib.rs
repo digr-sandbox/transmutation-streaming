@@ -32,6 +32,9 @@
 
 pub mod batch;
 pub mod converters;
+pub mod agentic {
+    pub use crate::engines::agentic::*;
+}
 #[cfg(feature = "docling-ffi")]
 #[doc = "Document types and processing (docling-core compatible)"]
 pub mod document;
