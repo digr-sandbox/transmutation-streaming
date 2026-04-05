@@ -285,8 +285,7 @@ impl ConversionBuilder {
         };
 
         Err(TransmutationError::UnsupportedFormat(format!(
-            "Format {input_format:?} is not supported or feature not enabled{}",
-            feature_hint
+            "Format {input_format:?} is not supported or feature not enabled{feature_hint}"
         )))
     }
 }

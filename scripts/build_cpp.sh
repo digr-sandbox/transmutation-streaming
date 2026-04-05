@@ -56,12 +56,18 @@ message(STATUS "Skipping Python bindings (FFI build)")
 # *****************
 # ***  Install  ***
 # *****************
-install(TARGETS parse_v1 parse_v2 DESTINATION lib)
+if(TARGET parse_v1)
+    install(TARGETS parse_v1 DESTINATION lib)
+endif()
+if(TARGET parse_v2)
+    install(TARGETS parse_v2 DESTINATION lib)
+endif()
 EOF
 
 # Extract everything up to the Python-binding marker and append our stub
-# This is more robust than line numbers
-sed -n '1,/Python-binding/p' CMakeLists.txt.bak | head -n -3 > CMakeLists.txt
+PYTHON_LINE=$(grep -nEi "pybind11|Python-binding" CMakeLists.txt.bak | head -n 1 | cut -d: -f1)
+CUT_LINE=$((PYTHON_LINE - 1))
+sed -n "1,${CUT_LINE}p" CMakeLists.txt.bak > CMakeLists.txt
 cat CMakeLists.txt.patch >> CMakeLists.txt
 rm CMakeLists.txt.patch
 

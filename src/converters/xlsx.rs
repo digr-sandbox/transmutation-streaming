@@ -276,9 +276,7 @@ impl DocumentConverter for XlsxConverter {
         ConverterMetadata {
             name: "XLSX Converter".to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
-            description:
-                "XLSX to Markdown/CSV/JSON/XML converter (pure Rust)"
-                    .to_string(),
+            description: "XLSX to Markdown/CSV/JSON/XML converter (pure Rust)".to_string(),
             external_deps: vec![],
         }
     }

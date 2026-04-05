@@ -119,7 +119,7 @@ impl SecurityEngine {
 
             // Replace matches calls
             for (pattern_str, regex) in &rule.pattern_map {
-                let call = format!("matches('{}')", pattern_str);
+                let call = format!("matches('{pattern_str}')");
                 eval_logic = eval_logic.replace(&call, &regex.is_match(command).to_string());
             }
 
