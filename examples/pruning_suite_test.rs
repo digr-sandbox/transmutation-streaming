@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::Path;
 
 use serde::Deserialize;
 
@@ -422,7 +421,7 @@ async fn main() {
         entries_vec.sort_by_key(|e| e.path());
         for entry in entries_vec {
             let path = entry.path();
-            if path.extension().map_or(true, |ext| ext == "json") {
+            if path.extension().is_none_or(|ext| ext == "json") {
                 continue;
             }
             let name = path.file_name().unwrap().to_string_lossy().to_string();

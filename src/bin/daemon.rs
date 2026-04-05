@@ -3,7 +3,7 @@
 //! Handles long-running state: Security Engine caching, File Watching (Latent-K),
 //! and SQLite audit locks. Listens on a local HTTP port.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
@@ -16,8 +16,8 @@ use regex::Regex;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
+use transmutation::Result as TransResult;
 use transmutation::engines::security::SecurityEngine;
-use transmutation::{Converter, OutputFormat, Result as TransResult};
 use walkdir::WalkDir;
 
 struct CodeMapEngine {
@@ -60,8 +60,8 @@ impl CodeMapEngine {
                 path.push('/');
                 path.push_str(part);
             }
-            edges.insert(format!("{}.rs", path));
-            edges.insert(format!("{}/mod.rs", path));
+            edges.insert(format!("{path}.rs"));
+            edges.insert(format!("{path}/mod.rs"));
         }
 
         for cap in rust_mod_re.captures_iter(content) {
@@ -69,9 +69,9 @@ impl CodeMapEngine {
                 .parent()
                 .unwrap()
                 .to_string_lossy()
-                .replace("\\", "/");
-            edges.insert(format!("{}/{}.rs", parent, &cap[1]));
-            edges.insert(format!("{}/{}/mod.rs", parent, &cap[1]));
+                .replace('\\', "/");
+            edges.insert(format!("{parent}/{}.rs", &cap[1]));
+            edges.insert(format!("{parent}/{}/mod.rs", &cap[1]));
         }
 
         for cap in rust_symbol_re.captures_iter(content) {
@@ -90,8 +90,8 @@ impl CodeMapEngine {
     fn build_initial_map(&self) {
         let mut all_data = Vec::new();
         for entry in WalkDir::new("src").into_iter().filter_map(|e| e.ok()) {
-            if entry.path().extension().map_or(false, |ext| ext == "rs") {
-                let source = entry.path().to_string_lossy().replace("\\", "/");
+            if entry.path().extension().is_some_and(|ext| ext == "rs") {
+                let source = entry.path().to_string_lossy().replace('\\', "/");
                 if let Ok(content) = std::fs::read_to_string(entry.path()) {
                     let (edges, symbols) = Self::extract_data(&content, &source);
                     all_data.push((source, edges, symbols));
@@ -137,7 +137,7 @@ impl CodeMapEngine {
             }
         }
 
-        let mut out = format!("[ARCHITECTURE CODE MAP]\nFile: {}\n", filename);
+        let mut out = format!("[ARCHITECTURE CODE MAP]\nFile: {filename}\n");
         out.push_str("Imports From: ");
         if imports_from.is_empty() {
             out.push_str("(None)\n");
@@ -173,7 +173,7 @@ impl CodeMapEngine {
 
         let mut out = "[ARCHITECTURAL RECONNAISSANCE]\n".to_string();
         for (dir, files) in clusters {
-            out.push_str(&format!("- {}: [{} files]\n", dir, files.len()));
+            out.push_str(&format!("- {dir}: [{count} files]\n", count = files.len()));
         }
         out
     }
@@ -208,8 +208,8 @@ impl CodeMapEngine {
 
         // 3. Fallback: Search all files for mentions of the symbol (excluding definitions)
         for entry in WalkDir::new("src").into_iter().filter_map(|e| e.ok()) {
-            if entry.path().extension().map_or(false, |ext| ext == "rs") {
-                let path = entry.path().to_string_lossy().replace("\\", "/");
+            if entry.path().extension().is_some_and(|ext| ext == "rs") {
+                let path = entry.path().to_string_lossy().replace('\\', "/");
                 if def_files.contains(&path) {
                     continue;
                 }
@@ -221,28 +221,24 @@ impl CodeMapEngine {
             }
         }
 
-        let mut out = format!(
-            "[BLAST RADIUS: {}]\nDefined in: {}\nFiles affected:\n",
-            symbol,
-            if def_files.is_empty() {
-                "(Unknown)".to_string()
-            } else {
-                def_files.join(", ")
-            }
-        );
+        let def_info = if def_files.is_empty() {
+            "(Unknown)".to_string()
+        } else {
+            def_files.join(", ")
+        };
+        let mut out =
+            format!("[BLAST RADIUS: {symbol}]\nDefined in: {def_info}\nFiles affected:\n");
 
         if affected.is_empty() {
             out.push_str("  (No usage found)\n");
         } else {
             for path in affected {
-                out.push_str(&format!("  - {}\n", path));
+                out.push_str(&format!("  - {path}\n"));
             }
         }
         out
     }
 }
-
-use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct AuditLogRecord {
@@ -273,12 +269,6 @@ struct ExecuteResponse {
 #[derive(Deserialize)]
 struct ProvenanceRequest {
     request_id: String,
-}
-
-#[derive(Serialize)]
-struct ProvenanceResponse {
-    content: String,
-    is_error: bool,
 }
 
 #[derive(Deserialize)]
@@ -427,7 +417,7 @@ async fn handle_discovery(
     let map = state.code_map.read_code_map(&payload.filename);
     let raw_content = std::fs::read_to_string(&payload.filename).unwrap_or_default();
     let skeleton = structural_extraction(&raw_content);
-    let final_content = format!("{}\n\n[STRUCTURAL SKELETON (Latent-K)]\n{}", map, skeleton);
+    let final_content = format!("{map}\n\n[STRUCTURAL SKELETON (Latent-K)]\n{skeleton}");
     let duration = start.elapsed().as_millis();
 
     let req_id = format!(
@@ -724,7 +714,7 @@ async fn handle_execute(
             is_error,
         }),
         Err(e) => Json(ExecuteResponse {
-            content: format!("Proxy Error: {}", e),
+            content: format!("Proxy Error: {e}"),
             is_error: true,
         }),
     }
@@ -737,7 +727,7 @@ async fn handle_provenance(Json(payload): Json<ProvenanceRequest>) -> Json<Gener
             is_error: false,
         }),
         Err(e) => Json(GenericResponse {
-            content: format!("Audit NotFound: {}", e),
+            content: format!("Audit NotFound: {e}"),
             is_error: true,
         }),
     }
@@ -799,7 +789,7 @@ async fn execute_secure_command(
         output_bytes: raw_input.len(),
     };
     if let Err(e) = offload_to_sqlite(&record, &raw_input, &raw_input) {
-        tracing::error!("Failed to save audit log to SQLite: {}", e);
+        tracing::error!("Failed to save audit log to SQLite: {e}");
     }
     Ok((raw_input, !status.success()))
 }
@@ -846,7 +836,7 @@ fn offload_to_sqlite(
         .unwrap_or_else(|| PathBuf::from("."));
     let db_path = db_dir.join("audit.db");
 
-    std::fs::create_dir_all(&db_dir).map_err(|e| transmutation::TransmutationError::IoError(e))?;
+    std::fs::create_dir_all(&db_dir).map_err(transmutation::TransmutationError::IoError)?;
 
     // Purge logic (1GB Budget)
     if let Ok(metadata) = std::fs::metadata(&db_path) {

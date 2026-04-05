@@ -5,7 +5,7 @@ use transmutation::{Converter, OutputFormat};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let input_text = r#"
+    let input_text = r"
 # Introduction
 
 This is a sample document passed as plain text.
@@ -19,7 +19,7 @@ This is a sample document passed as plain text.
 ## Conclusion
 
 It works perfectly!
-"#;
+";
 
     // Create a temporary file with a .txt extension
     let mut temp_file = Builder::new().suffix(".txt").tempfile()?;

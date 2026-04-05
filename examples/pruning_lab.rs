@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 /// --- PRUNING LAB: Feature Implementations ---
-
 /// Feature 1: IDF Scoring (Inverse Document Frequency)
 /// Measures how "unique" a word is in the entire 30MB document.
 fn calculate_idf(words: &[String]) -> HashMap<String, f64> {
@@ -59,7 +58,6 @@ fn calculate_pos_score(word: &str) -> f64 {
 }
 
 /// --- EVALUATION RUN ---
-
 fn main() {
     println!("🧪 PROMPT PRUNING EVALUATION LAB");
     println!("================================");

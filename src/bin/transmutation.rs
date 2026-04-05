@@ -313,7 +313,7 @@ async fn run_command(cli: Cli) -> Result<()> {
                     .map(PathBuf::from);
                 if let Some(ref d) = custom_temp {
                     std::fs::create_dir_all(d)
-                        .map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                        .map_err(transmutation::TransmutationError::IoError)?;
                 }
 
                 // 1. Sniff the first 8KB to determine the true file format
@@ -322,7 +322,7 @@ async fn run_command(cli: Cli) -> Result<()> {
                 while sniff_len < 8192 {
                     let n = stdin
                         .read(&mut sniff_buffer[sniff_len..])
-                        .map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                        .map_err(transmutation::TransmutationError::IoError)?;
                     if n == 0 {
                         break;
                     }
@@ -351,10 +351,10 @@ async fn run_command(cli: Cli) -> Result<()> {
                 let mut temp_file = match custom_temp {
                     Some(ref d) => builder
                         .tempfile_in(d)
-                        .map_err(|e| transmutation::TransmutationError::IoError(e))?,
+                        .map_err(transmutation::TransmutationError::IoError)?,
                     None => builder
                         .tempfile()
-                        .map_err(|e| transmutation::TransmutationError::IoError(e))?,
+                        .map_err(transmutation::TransmutationError::IoError)?,
                 };
 
                 if !cli.quiet {
@@ -369,14 +369,14 @@ async fn run_command(cli: Cli) -> Result<()> {
                 // Write the sniffed bytes first
                 temp_file
                     .write_all(&sniff_buffer)
-                    .map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                    .map_err(transmutation::TransmutationError::IoError)?;
 
                 // Spool the rest of the stream into the single temp file
                 std::io::copy(&mut stdin, &mut temp_file)
-                    .map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                    .map_err(transmutation::TransmutationError::IoError)?;
                 temp_file
                     .flush()
-                    .map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                    .map_err(transmutation::TransmutationError::IoError)?;
 
                 let path = temp_file.path().to_path_buf();
 
@@ -454,7 +454,7 @@ async fn run_command(cli: Cli) -> Result<()> {
 
         Commands::Run {
             command,
-            output,
+            output: _,
             format,
             optimize_llm,
         } => {
@@ -471,7 +471,7 @@ async fn run_command(cli: Cli) -> Result<()> {
             builder.suffix(".txt");
             let mut temp_file = builder
                 .tempfile()
-                .map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                .map_err(transmutation::TransmutationError::IoError)?;
 
             // 2. Spawn and capture (Merged stdout/stderr)
             let mut child = std::process::Command::new(&command[0])
@@ -479,20 +479,20 @@ async fn run_command(cli: Cli) -> Result<()> {
                 .stdout(std::process::Stdio::piped())
                 .stderr(std::process::Stdio::piped())
                 .spawn()
-                .map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                .map_err(transmutation::TransmutationError::IoError)?;
 
             let mut stdout = child.stdout.take().unwrap();
             let mut stderr = child.stderr.take().unwrap();
 
             // Stream both to the same file
             std::io::copy(&mut stdout, &mut temp_file)
-                .map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                .map_err(transmutation::TransmutationError::IoError)?;
             std::io::copy(&mut stderr, &mut temp_file)
-                .map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                .map_err(transmutation::TransmutationError::IoError)?;
 
             let status = child
                 .wait()
-                .map_err(|e| transmutation::TransmutationError::IoError(e))?;
+                .map_err(transmutation::TransmutationError::IoError)?;
             let shell_duration = start_shell.elapsed();
 
             if !cli.quiet {
@@ -575,14 +575,6 @@ async fn run_command(cli: Cli) -> Result<()> {
     }
 }
 
-fn print_engine_status(name: &str, enabled: bool) {
-    if enabled {
-        println!("  {} {}", "✓".green(), name);
-    } else {
-        println!("  {} {} {}", "✗".red(), name, "(disabled)".dimmed());
-    }
-}
-
 struct AuditLogRecord {
     timestamp: chrono::DateTime<chrono::Utc>,
     command: String,
@@ -598,7 +590,7 @@ fn offload_to_sqlite(record: &AuditLogRecord) -> Result<()> {
         .map(|p| p.join(".transmutation"))
         .unwrap_or_else(|| PathBuf::from("."));
 
-    std::fs::create_dir_all(&db_dir).map_err(|e| transmutation::TransmutationError::IoError(e))?;
+    std::fs::create_dir_all(&db_dir).map_err(transmutation::TransmutationError::IoError)?;
     let db_path = db_dir.join("audit.db");
 
     // Purge logic (1GB Budget)
