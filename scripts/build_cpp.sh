@@ -45,9 +45,6 @@ if [ ! -f "CMakeLists.txt.bak" ]; then
 fi
 
 # Replace pybind11 section with a stub
-# We insert our install command before the Python-binding section
-sed '/Python-binding/i install(TARGETS parse_v1 parse_v2 DESTINATION lib)' CMakeLists.txt.bak > CMakeLists.txt.tmp
-
 cat > CMakeLists.txt.patch << 'EOF'
 # ***************************
 # ***  Python-binding     ***
@@ -55,13 +52,18 @@ cat > CMakeLists.txt.patch << 'EOF'
 
 # Skipped for FFI-only build (no pybind11 required)
 message(STATUS "Skipping Python bindings (FFI build)")
+
+# *****************
+# ***  Install  ***
+# *****************
+install(TARGETS parse_v1 parse_v2 DESTINATION lib)
 EOF
 
 # Extract everything up to the Python-binding marker and append our stub
 # This is more robust than line numbers
-sed -n '1,/Python-binding/p' CMakeLists.txt.tmp | head -n -3 > CMakeLists.txt
+sed -n '1,/Python-binding/p' CMakeLists.txt.bak | head -n -3 > CMakeLists.txt
 cat CMakeLists.txt.patch >> CMakeLists.txt
-rm CMakeLists.txt.tmp CMakeLists.txt.patch
+rm CMakeLists.txt.patch
 
 echo -e "\n\033[1;33m[2/3] Building docling-parse C++ libs...\033[0m"
 DOCLING_BUILD_DIR="build_${OS}_${ARCH}_docling"
