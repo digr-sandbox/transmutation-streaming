@@ -3,16 +3,25 @@
 //! Provides Latent-K based structural skeletonization and Architecture Code Maps.
 
 use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use regex::Regex;
 use rusqlite::Connection;
 use walkdir::WalkDir;
 
+/// Engine for architectural mapping and structural code extraction.
 pub struct CodeMapEngine {
+    /// SQLite connection for edge and symbol storage.
     pub conn: std::sync::Mutex<Connection>,
 }
 
+impl std::fmt::Debug for CodeMapEngine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CodeMapEngine").finish()
+    }
+}
+
 impl CodeMapEngine {
+    /// Create a new CodeMapEngine with an in-memory SQLite database.
     pub fn new() -> Self {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute(
@@ -30,6 +39,7 @@ impl CodeMapEngine {
         }
     }
 
+    /// Extract edges (imports) and symbols (definitions) from source content.
     pub fn extract_data(content: &str, file_path: &str) -> (HashSet<String>, HashSet<String>) {
         let mut edges = HashSet::new();
         let mut symbols = HashSet::new();
@@ -75,6 +85,7 @@ impl CodeMapEngine {
         )
     }
 
+    /// Build the initial architectural map by scanning the src directory.
     pub fn build_initial_map(&self) {
         let mut all_data = Vec::new();
         for entry in WalkDir::new("src").into_iter().filter_map(|e| e.ok()) {
@@ -104,6 +115,7 @@ impl CodeMapEngine {
         }
     }
 
+    /// Read the architectural code map for a specific file.
     pub fn read_code_map(&self, filename: &str) -> String {
         let mut imports_from = Vec::new();
         let mut imported_by = Vec::new();
@@ -143,6 +155,7 @@ impl CodeMapEngine {
         out
     }
 
+    /// Perform global architectural reconnaissance.
     pub fn query_recon(&self) -> String {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare("SELECT DISTINCT source FROM edges").unwrap();
@@ -166,6 +179,7 @@ impl CodeMapEngine {
         out
     }
 
+    /// Calculate the blast radius of a symbol change.
     pub fn query_impact(&self, symbol: &str) -> String {
         let conn = self.conn.lock().unwrap();
 
@@ -234,7 +248,7 @@ pub fn structural_extraction(original_input: &str) -> String {
         "if", "else", "let", "var", "const", "return", "public", "private", "protected",
         "class", "function", "fn", "void", "int", "char", "string", "bool", "true", "false",
         "import", "from", "use", "include", "struct", "impl", "type", "interface", "package",
-        "namespace", "static", "async", "await", "try", "catch", "throw", "new", "delete",
+        "namespace", "static", "async", "await", "try", "catch", "throw", "new",
         "this", "self", "super", "for", "while", "do", "switch", "case", "default", "break",
         "continue", "in", "of", "as", "is",
     ]

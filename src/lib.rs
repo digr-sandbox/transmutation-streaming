@@ -32,6 +32,7 @@
 
 pub mod batch;
 pub mod converters;
+/// Agentic tools for architectural mapping and structural extraction.
 pub mod agentic {
     pub use crate::engines::agentic::*;
 }
