@@ -7,6 +7,118 @@ use std::path::Path;
 use regex::Regex;
 use rusqlite::Connection;
 use walkdir::WalkDir;
+use std::io::{BufRead, BufReader};
+use std::fs::File;
+
+fn flatten_toon(val: &serde_json::Value, out: &mut String, prefix: &str) {
+    match val {
+        serde_json::Value::Object(map) => {
+            for (k, v) in map {
+                let new_prefix = if prefix.is_empty() { k.clone() } else { format!("{prefix}.{k}") };
+                flatten_toon(v, out, &new_prefix);
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            out.push_str(&format!("{prefix}[{}]: ", arr.len()));
+            for v in arr {
+                if v.is_string() || v.is_number() || v.is_boolean() {
+                    out.push_str(&format!("{} ", v.to_string().trim_matches('"')));
+                }
+            }
+            out.push('\n');
+        }
+        _ => {
+            out.push_str(&format!("{prefix}: {}\n", val.to_string().trim_matches('"')));
+        }
+    }
+}
+
+pub fn stream_toon(
+    file_path: &str,
+    search_pattern: Option<&str>,
+    offset: usize,
+    limit: usize,
+) -> Result<String, std::io::Error> {
+    let file = File::open(file_path)?;
+    let reader = BufReader::new(file);
+
+    let re = search_pattern.and_then(|p| Regex::new(p).ok());
+    let mut out = String::new();
+    let mut match_count = 0;
+    let mut lines_added = 0;
+    let mut has_more = false;
+
+    for line_result in reader.lines() {
+        let line = match line_result {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        // Try to parse as JSON
+        let parsed = serde_json::from_str::<serde_json::Value>(trimmed);
+        
+        let mut toon_str = String::new();
+        if let Ok(val) = parsed {
+            flatten_toon(&val, &mut toon_str, "");
+        } else {
+            toon_str = line;
+            toon_str.push('\n');
+        }
+
+        // Filter and Paginate
+        for t_line in toon_str.lines() {
+            let t_trimmed = t_line.trim();
+            if t_trimmed.is_empty() {
+                continue;
+            }
+
+            let matches = match &re {
+                Some(regex) => regex.is_match(t_trimmed),
+                None => true,
+            };
+
+            if matches {
+                if match_count >= offset {
+                    if lines_added < limit {
+                        out.push_str(t_trimmed);
+                        out.push('\n');
+                        lines_added += 1;
+                    } else {
+                        has_more = true;
+                        break;
+                    }
+                }
+                match_count += 1;
+            }
+        }
+        if has_more {
+            break;
+        }
+    }
+
+    let header = format!(
+        "# ⚡ TOON STREAM [Matches Returned: {} | Offset: {} | Limit: {} | Has More: {}]\n---\n",
+        lines_added, offset, limit, if has_more { "TRUE" } else { "FALSE" }
+    );
+
+    let mut final_out = header;
+    if out.is_empty() {
+        final_out.push_str("(No matches found or EOF reached)\n");
+    } else {
+        final_out.push_str(&out);
+    }
+
+    if has_more {
+        final_out.push_str("\n--- [TRUNCATED: Use higher offset to see more results] ---\n");
+    }
+
+    Ok(final_out)
+}
 
 /// Engine for architectural mapping and structural code extraction.
 pub struct CodeMapEngine {
