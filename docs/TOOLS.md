@@ -9,8 +9,9 @@ To maximize efficiency, agents should follow this "Discovery-First" protocol:
 1.  **`query_recon`**: Call first to understand the global architectural clusters of the project.
 2.  **`query_discovery`**: Call before reading a specific file. It provides the **Architecture Code Map** and **Structural Skeleton**.
 3.  **`query_impact`**: Call before modifying a symbol to see the "blast radius" of the change across the workspace.
-4.  **`execute_secure_command`**: Use for all shell execution (build, test, grep).
-5.  **`get_provenance`**: Call if a hallucination is suspected to retrieve the raw, uncrushed output of a previous command.
+4.  **`query_toon`**: Call to search and stream flattened, high-density JSON/XML/Log data from massive files (1GB+) without causing OOM crashes.
+5.  **`execute_secure_command`**: Use for all shell execution (build, test, grep).
+6.  **`get_provenance`**: Call if a hallucination is suspected to retrieve the raw, uncrushed output of a previous command.
 
 ---
 
@@ -35,7 +36,17 @@ To maximize efficiency, agents should follow this "Discovery-First" protocol:
 *   **Outputs**: A list of all files and line numbers where that symbol is used or referenced across the entire workspace.
 *   **Token Savings**: Replaces multiple expensive `grep` calls with a single indexed query.
 
-## 4. `execute_secure_command`
+## 4. `query_toon`
+**Purpose**: Search and stream high-density JSON/XML/Log data from massive files.
+*   **Inputs**:
+    *   `filename` (string): The path to the file (e.g., a 1GB+ JSON dump).
+    *   `search_pattern` (string, optional): A regex to filter the flattened output.
+    *   `offset` (int, optional): Line offset for pagination.
+    *   `limit` (int, optional): Max lines to return (default 100).
+*   **Outputs**: A flattened, line-by-line string of matched, Token-Oriented Object Notation (TOON) compressed data.
+*   **Token Savings**: Prevents OOM crashes by reading massive files line-by-line as a stream, crushing JSON arrays into dot-notation, and discarding unmatched keys before they hit memory.
+
+## 5. `execute_secure_command`
 **Purpose**: The zero-trust gateway for shell execution.
 *   **Inputs**: `command` (string) - The shell command to run.
 *   **Outputs**: The **raw** output of the command (Transmutation separates execution from crushing for this tool to ensure implementation details are available when explicitly requested).
@@ -44,7 +55,7 @@ To maximize efficiency, agents should follow this "Discovery-First" protocol:
     *   **Windows**: Blocks `Remove-Item`, Registry edits (`HKLM:`), and malicious `powershell` string replacements.
     *   **macOS**: Blocks Keychain access and sensitive library paths.
 
-## 5. `get_provenance`
+## 6. `get_provenance`
 **Purpose**: Verification and hallucination recovery.
 *   **Inputs**: `request_id` (string) - The ID found in the `# ⚡ PROVENANCE` header of any crushed output.
 *   **Outputs**: A JSON object containing:
@@ -62,5 +73,6 @@ To maximize efficiency, agents should follow this "Discovery-First" protocol:
 | `query_recon` | `ls -R` / `tree` | **High** (Clusters vs Files) | 90% |
 | `query_discovery` | `cat` | **Extreme** (Structure vs Slop) | 95% |
 | `query_impact` | `grep -r` | **High** (Verified Refs vs Text) | 80% |
+| `query_toon` | `grep` on JSON/Logs | **Extreme** (DOM vs String) | 99% (Prevents OOM) |
 | `execute_secure_command` | `run_shell_command` | **Security** (Verified vs Blind) | N/A |
 | `get_provenance` | N/A | **Trust** (Truth vs Pruning) | N/A |
