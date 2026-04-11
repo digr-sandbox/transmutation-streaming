@@ -131,6 +131,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     "properties": { "filename": { "type": "string" } },
                                     "required": ["filename"]
                                 }
+                            },
+                            {
+                                "name": "query_toon",
+                                "description": "Stream, flatten (TOON), and search large JSON/log files without loading them fully into memory.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "filename": { "type": "string" },
+                                        "search_pattern": { "type": "string", "description": "Optional regex to filter the flattened output." },
+                                        "offset": { "type": "integer", "description": "Optional line offset for pagination." },
+                                        "limit": { "type": "integer", "description": "Optional line limit (default 100)." }
+                                    },
+                                    "required": ["filename"]
+                                }
                             }
                         ],
                         "nextCursor": "none"
@@ -178,6 +192,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .as_str()
                         .unwrap_or("");
                     match fetch_from_daemon(&client, "discovery", json!({ "filename": filename }))
+                        .await
+                    {
+                        Ok(res) => {
+                            json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": res.content }], "isError": res.is_error } })
+                        }
+                        Err(e) => {
+                            json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [{ "type": "text", "text": format!("Daemon Error: {}", e) }], "isError": true } })
+                        }
+                    }
+                } else if tool_name == "query_toon" {
+                    let filename = req["params"]["arguments"]["filename"]
+                        .as_str()
+                        .unwrap_or("");
+                    let search_pattern = req["params"]["arguments"]["search_pattern"].as_str();
+                    let offset = req["params"]["arguments"]["offset"].as_i64().map(|v| v as usize);
+                    let limit = req["params"]["arguments"]["limit"].as_i64().map(|v| v as usize);
+                    match fetch_from_daemon(&client, "toon", json!({ "filename": filename, "search_pattern": search_pattern, "offset": offset, "limit": limit }))
                         .await
                     {
                         Ok(res) => {

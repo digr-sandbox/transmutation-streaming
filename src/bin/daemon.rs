@@ -70,6 +70,14 @@ struct AppState {
     code_map: Arc<CodeMapEngine>,
 }
 
+#[derive(Deserialize)]
+struct ToonRequest {
+    filename: String,
+    search_pattern: Option<String>,
+    offset: Option<usize>,
+    limit: Option<usize>,
+}
+
 #[tokio::main]
 async fn main() {
     let log_dir = dirs::home_dir()
@@ -112,11 +120,29 @@ async fn main() {
         .route("/recon", post(handle_recon))
         .route("/impact", post(handle_impact))
         .route("/discovery", post(handle_discovery))
+        .route("/toon", post(handle_toon))
         .with_state(state);
 
     let listener = TcpListener::bind("127.0.0.1:48192").await.unwrap();
     tracing::info!("Daemon listening on 127.0.0.1:48192");
     axum::serve(listener, app).await.unwrap();
+}
+
+async fn handle_toon(Json(payload): Json<ToonRequest>) -> Json<GenericResponse> {
+    let offset = payload.offset.unwrap_or(0);
+    let limit = payload.limit.unwrap_or(100);
+    let pattern = payload.search_pattern.as_deref();
+
+    match transmutation::agentic::stream_toon(&payload.filename, pattern, offset, limit) {
+        Ok(content) => Json(GenericResponse {
+            content,
+            is_error: false,
+        }),
+        Err(e) => Json(GenericResponse {
+            content: format!("TOON Stream Error: {e}"),
+            is_error: true,
+        }),
+    }
 }
 
 async fn handle_recon(State(state): State<Arc<AppState>>) -> Json<GenericResponse> {

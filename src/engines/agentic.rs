@@ -9,19 +9,32 @@ use rusqlite::Connection;
 use walkdir::WalkDir;
 use std::io::{BufRead, BufReader, Read};
 use std::fs::File;
+use serde::Deserialize;
 
-fn flatten_toon(val: &serde_json::Value, out: &mut Vec<String>, prefix: &str) {
+fn flatten_toon_optimized(val: &serde_json::Value, out: &mut Vec<String>, prefix: &str, is_element_root: bool) {
     match val {
         serde_json::Value::Object(map) => {
+            if is_element_root {
+                out.push(format!("[{prefix}]"));
+            }
             for (k, v) in map {
-                let new_prefix = if prefix.is_empty() { k.clone() } else { format!("{prefix}.{k}") };
-                flatten_toon(v, out, &new_prefix);
+                let new_prefix = if is_element_root { format!(".{k}") } else { format!("{prefix}.{k}") };
+                flatten_toon_optimized(v, out, &new_prefix, false);
             }
         }
         serde_json::Value::Array(arr) => {
-            for (i, v) in arr.iter().enumerate() {
-                let new_prefix = format!("{prefix}[{i}]");
-                flatten_toon(v, out, &new_prefix);
+            let all_primitives = arr.iter().all(|v| v.is_string() || v.is_number() || v.is_boolean());
+            if all_primitives && !arr.is_empty() {
+                let vals: Vec<String> = arr.iter().map(|v| v.to_string().trim_matches('"').to_string()).collect();
+                out.push(format!("{prefix}: {}", vals.join(" ")));
+            } else {
+                if is_element_root {
+                    out.push(format!("[{prefix}]"));
+                }
+                for (i, v) in arr.iter().enumerate() {
+                    let new_prefix = if is_element_root { format!("[{i}]") } else { format!("{prefix}[{i}]") };
+                    flatten_toon_optimized(v, out, &new_prefix, v.is_object());
+                }
             }
         }
         serde_json::Value::String(s) => {
@@ -33,104 +46,346 @@ fn flatten_toon(val: &serde_json::Value, out: &mut Vec<String>, prefix: &str) {
     }
 }
 
+#[derive(Debug)]
+enum Context {
+    Object { expecting_key: bool },
+    Array { index: usize },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum PathSeg {
+    Key(String),
+    Index(usize),
+}
+
+fn format_path(path: &[PathSeg]) -> String {
+    let mut s = String::from("root");
+    for p in path {
+        match p {
+            PathSeg::Key(k) => { s.push('.'); s.push_str(k); },
+            PathSeg::Index(i) => { s.push('['); s.push_str(&i.to_string()); s.push(']'); },
+        }
+    }
+    s
+}
+
+fn skip_whitespace(iter: &mut std::iter::Peekable<impl Iterator<Item=std::io::Result<u8>>>) {
+    while let Some(res) = iter.peek() {
+        if let Ok(b) = res {
+            if b.is_ascii_whitespace() {
+                iter.next();
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+}
+
+fn read_string(iter: &mut std::iter::Peekable<impl Iterator<Item=std::io::Result<u8>>>, truncate_len: usize) -> String {
+    let mut s = String::new();
+    iter.next(); // skip quote
+    let mut escaped = false;
+    let mut len = 0;
+    let mut truncated = false;
+    while let Some(Ok(b)) = iter.next() {
+        if escaped {
+            if !truncated {
+                match b {
+                    b'n' => s.push('\n'),
+                    b'r' => s.push('\r'),
+                    b't' => s.push('\t'),
+                    b'"' => s.push('"'),
+                    b'\\' => s.push('\\'),
+                    b'/' => s.push('/'),
+                    b'b' => s.push('\x08'),
+                    b'f' => s.push('\x0C'),
+                    _ => s.push(b as char),
+                }
+                len += 1;
+            }
+            escaped = false;
+        } else if b == b'\\' {
+            escaped = true;
+        } else if b == b'"' {
+            break;
+        } else {
+            if len < truncate_len {
+                s.push(b as char);
+                len += 1;
+            } else if !truncated {
+                s.push_str("... [TRUNCATED]");
+                truncated = true;
+            }
+        }
+    }
+    s
+}
+
+fn read_primitive(iter: &mut std::iter::Peekable<impl Iterator<Item=std::io::Result<u8>>>) -> String {
+    let mut s = String::new();
+    let mut len = 0;
+    let mut truncated = false;
+    while let Some(Ok(b)) = iter.peek() {
+        let b = *b;
+        if b == b',' || b == b']' || b == b'}' || b.is_ascii_whitespace() {
+            break;
+        }
+        if len < 1000 {
+            s.push(b as char);
+            len += 1;
+        } else if !truncated {
+            s.push_str("... [TRUNCATED]");
+            truncated = true;
+        }
+        iter.next();
+    }
+    s
+}
+
 pub fn stream_toon(
     file_path: &str,
     search_pattern: Option<&str>,
     offset: usize,
     limit: usize,
 ) -> Result<String, std::io::Error> {
-    let mut raw_content = std::fs::read_to_string(file_path)?;
+    use std::io::Read;
     
-    // Remove BOM if present
-    if raw_content.starts_with('\u{feff}') {
-        raw_content = raw_content[3..].to_string();
-    }
+    let file = std::fs::File::open(file_path)?;
+    let reader = std::io::BufReader::new(file);
+    let mut iter = reader.bytes().peekable();
+    let re = search_pattern.and_then(|p| Regex::new(p).ok());
 
-    let mut all_toon_lines = Vec::new();
+    let mut stack: Vec<Context> = Vec::new();
+    let mut path: Vec<PathSeg> = Vec::new();
 
-    // Strategy: Parse using serde_json::from_str for whole DOM flattening.
-    // If it fails (too deep), we fallback to line-by-line.
-    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw_content) {
-        flatten_toon(&value, &mut all_toon_lines, "root");
-    } else {
-        // Fallback: NDJSON
-        for line in raw_content.lines() {
-            let trimmed = line.trim();
-            if trimmed.is_empty() { continue; }
-            if let Ok(val) = serde_json::from_str::<serde_json::Value>(trimmed) {
-                flatten_toon(&val, &mut all_toon_lines, "node");
-            } else {
-                all_toon_lines.push(trimmed.to_string());
+    let mut matches_buffered: Vec<(Vec<PathSeg>, String)> = Vec::new();
+    let mut match_count = 0;
+    let mut has_more = false;
+
+    let mut pop_path_if_needed = |stack: &mut Vec<Context>, path: &mut Vec<PathSeg>| {
+        if let Some(ctx) = stack.last_mut() {
+            match ctx {
+                Context::Object { expecting_key } => {
+                    if !*expecting_key {
+                        path.pop();
+                        *expecting_key = true;
+                    }
+                }
+                Context::Array { .. } => {
+                    path.pop();
+                }
             }
+        }
+    };
+
+    loop {
+        skip_whitespace(&mut iter);
+        let b = match iter.peek() {
+            Some(Ok(b)) => *b,
+            _ => break,
+        };
+
+        if let Some(ctx) = stack.last_mut() {
+            match ctx {
+                Context::Object { expecting_key } => {
+                    if b == b'}' {
+                        stack.pop();
+                        iter.next();
+                        pop_path_if_needed(&mut stack, &mut path);
+                        continue;
+                    }
+                    if b == b',' {
+                        iter.next();
+                        continue;
+                    }
+                    if *expecting_key {
+                        if b == b'"' {
+                            let key = read_string(&mut iter, 1000);
+                            *expecting_key = false;
+                            path.push(PathSeg::Key(key));
+                            skip_whitespace(&mut iter);
+                            if let Some(Ok(b':')) = iter.peek() {
+                                iter.next();
+                            }
+                            continue;
+                        }
+                        // unexpected
+                        iter.next();
+                        continue;
+                    }
+                }
+                Context::Array { index } => {
+                    if b == b']' {
+                        stack.pop();
+                        iter.next();
+                        pop_path_if_needed(&mut stack, &mut path);
+                        continue;
+                    }
+                    if b == b',' {
+                        iter.next();
+                        continue;
+                    }
+                    path.push(PathSeg::Index(*index));
+                    *index += 1;
+                }
+            }
+        }
+
+        skip_whitespace(&mut iter);
+        let b = match iter.peek() {
+            Some(Ok(b)) => *b,
+            _ => break,
+        };
+
+        let mut is_primitive = false;
+        let mut val_str = String::new();
+
+        if b == b'{' {
+            stack.push(Context::Object { expecting_key: true });
+            iter.next();
+        } else if b == b'[' {
+            stack.push(Context::Array { index: 0 });
+            iter.next();
+        } else if b == b'"' {
+            let s = read_string(&mut iter, 1000);
+            val_str = format!("\"{}\"", s);
+            is_primitive = true;
+        } else if b == b']' || b == b'}' {
+            iter.next();
+            stack.pop();
+            pop_path_if_needed(&mut stack, &mut path);
+        } else {
+            val_str = read_primitive(&mut iter);
+            if !val_str.is_empty() {
+                is_primitive = true;
+            } else {
+                iter.next(); // unhandled character
+            }
+        }
+
+        if is_primitive {
+            let full_path_str = format_path(&path);
+            let formatted_line = format!("{}: {}", full_path_str, val_str);
+            
+            let is_match = match &re {
+                Some(r) => r.is_match(&formatted_line),
+                None => true,
+            };
+
+            if is_match {
+                if match_count >= offset {
+                    if matches_buffered.len() < limit {
+                        matches_buffered.push((path.clone(), val_str));
+                    } else {
+                        has_more = true;
+                        break;
+                    }
+                }
+                match_count += 1;
+            }
+
+            pop_path_if_needed(&mut stack, &mut path);
         }
     }
 
-    let re = search_pattern.and_then(|p| Regex::new(p).ok());
-    let mut match_count = 0;
-    let mut lines_added = 0;
-    let mut has_more = false;
-    let mut candidates = Vec::new();
-
-    for t_line in all_toon_lines {
-        let matches = match &re {
-            Some(regex) => regex.is_match(&t_line),
-            None => true,
-        };
-
-        if matches {
-            if match_count >= offset {
-                if lines_added < limit {
-                    candidates.push(t_line);
-                    lines_added += 1;
+    let mut lcp_len = 0;
+    if !matches_buffered.is_empty() {
+        let first_path = &matches_buffered[0].0;
+        lcp_len = first_path.len();
+        for (p, _) in matches_buffered.iter().skip(1) {
+            let mut matched_len = 0;
+            for (a, b) in first_path.iter().zip(p.iter()) {
+                if a == b {
+                    matched_len += 1;
                 } else {
-                    has_more = true;
                     break;
                 }
             }
-            match_count += 1;
+            lcp_len = std::cmp::min(lcp_len, matched_len);
         }
     }
 
-    // --- OPTIMIZATION: Adaptive Breadcrumb Context (R-TOON) ---
-    let mut breadcrumb = String::new();
-    let mut final_lines = candidates;
+    let lcp_str = if matches_buffered.is_empty() {
+        "root".to_string()
+    } else {
+        format_path(&matches_buffered[0].0[..lcp_len])
+    };
 
-    if !final_lines.is_empty() {
-        if let Some(first) = final_lines.first().cloned() {
-            let parts: Vec<&str> = first.split(':').collect();
-            if parts.len() > 1 {
-                let path_parts: Vec<&str> = parts[0].split('.').collect();
-                let mut common_path = Vec::new();
-                for i in 0..path_parts.len() {
-                    let current_test = path_parts[..=i].join(".");
-                    if final_lines.iter().all(|l| l.starts_with(&current_test)) {
-                        common_path.push(path_parts[i]);
-                    } else { break; }
-                }
-                if !common_path.is_empty() {
-                    breadcrumb = common_path.join(".");
-                    let strip_len = breadcrumb.len();
-                    for line in &mut final_lines {
-                        if line.starts_with(&breadcrumb) {
-                            *line = format!(".{}", &line[strip_len..]);
+    let mut ordered_groups: Vec<(String, Vec<(String, String)>)> = Vec::new();
+
+    for (p, val) in matches_buffered {
+        let lcp_stripped = &p[lcp_len..];
+        let mut parent_path = String::new();
+        let mut prop_name = String::new();
+
+        if lcp_stripped.is_empty() {
+            prop_name = "".to_string();
+        } else {
+            let parent_len = lcp_stripped.len().saturating_sub(1);
+            let parent_segs = &lcp_stripped[..parent_len];
+            let last_seg = &lcp_stripped[parent_len];
+
+            for seg in parent_segs {
+                match seg {
+                    PathSeg::Key(k) => {
+                        if !parent_path.is_empty() {
+                            parent_path.push('.');
                         }
+                        parent_path.push_str(k);
                     }
-                    if breadcrumb.len() > 200 {
-                        breadcrumb = format!("{}...{}", &breadcrumb[..50], &breadcrumb[breadcrumb.len()-50..]);
+                    PathSeg::Index(i) => {
+                        parent_path.push('[');
+                        parent_path.push_str(&i.to_string());
+                        parent_path.push(']');
                     }
                 }
+            }
+
+            match last_seg {
+                PathSeg::Key(k) => {
+                    prop_name = format!(".{}", k);
+                }
+                PathSeg::Index(i) => {
+                    prop_name = format!("[{}]", i);
+                }
+            }
+        }
+
+        if let Some((last_parent, props)) = ordered_groups.last_mut() {
+            if *last_parent == parent_path {
+                props.push((prop_name, val));
+                continue;
+            }
+        }
+        ordered_groups.push((parent_path, vec![(prop_name, val)]));
+    }
+
+    let mut out = format!("# ⚡ TOON STREAM\n# CONTEXT: {}\n", lcp_str);
+    if ordered_groups.is_empty() {
+        out.push_str("(No matches found or EOF reached)\n");
+    }
+
+    for (parent, props) in ordered_groups {
+        if !parent.is_empty() {
+            out.push_str(&format!("\n[{}]\n", parent));
+        } else {
+            out.push_str("\n[.]\n");
+        }
+        for (prop, val) in props {
+            if prop.is_empty() {
+                out.push_str(&format!("= {}\n", val));
+            } else {
+                out.push_str(&format!("{}: {}\n", prop, val));
             }
         }
     }
 
-    let header = format!("# ⚡ TOON STREAM [Matches: {} | Offset: {} | Limit: {} | Has More: {}]\n", 
-        lines_added, offset, limit, if has_more { "TRUE" } else { "FALSE" });
-    let mut out = header;
-    if !breadcrumb.is_empty() { out.push_str(&format!("# CONTEXT: {}\n", breadcrumb)); }
-    out.push_str("---\n");
-    if final_lines.is_empty() { out.push_str("(No matches found or EOF reached)\n"); }
-    else { for l in final_lines { out.push_str(&l); out.push('\n'); } }
-    if has_more { out.push_str("\n--- [TRUNCATED: Use higher offset to see more results] ---\n"); }
+    if has_more {
+        out.push_str("\n--- [TRUNCATED: Use higher offset...] ---\n");
+    }
+
     Ok(out)
 }
 

@@ -22,58 +22,12 @@ impl BoringTable {
     fn new() -> Self {
         let mut tokens = HashSet::new();
         let common = [
-            "if",
-            "else",
-            "let",
-            "var",
-            "const",
-            "return",
-            "public",
-            "private",
-            "protected",
-            "class",
-            "function",
-            "fn",
-            "void",
-            "int",
-            "char",
-            "string",
-            "bool",
-            "true",
-            "false",
-            "import",
-            "from",
-            "use",
-            "include",
-            "struct",
-            "impl",
-            "type",
-            "interface",
-            "package",
-            "namespace",
-            "static",
-            "async",
-            "await",
-            "try",
-            "catch",
-            "throw",
-            "new",
-            "delete",
-            "this",
-            "self",
-            "super",
-            "for",
-            "while",
-            "do",
-            "switch",
-            "case",
-            "default",
-            "break",
-            "continue",
-            "in",
-            "of",
-            "as",
-            "is",
+            "if", "else", "let", "var", "const", "return", "public", "private", "protected",
+            "class", "function", "fn", "void", "int", "char", "string", "bool", "true", "false",
+            "import", "from", "use", "include", "struct", "impl", "type", "interface", "package",
+            "namespace", "static", "async", "await", "try", "catch", "throw", "new", "delete",
+            "this", "self", "super", "for", "while", "do", "switch", "case", "default", "break",
+            "continue", "in", "of", "as", "is",
         ];
         for t in common {
             tokens.insert(t);
@@ -162,58 +116,12 @@ fn structural_extraction(original_input: &str) -> String {
     let mut depth = 0;
     let mut in_structural = false;
     let boredom_table: HashSet<&str> = [
-        "if",
-        "else",
-        "let",
-        "var",
-        "const",
-        "return",
-        "public",
-        "private",
-        "protected",
-        "class",
-        "function",
-        "fn",
-        "void",
-        "int",
-        "char",
-        "string",
-        "bool",
-        "true",
-        "false",
-        "import",
-        "from",
-        "use",
-        "include",
-        "struct",
-        "impl",
-        "type",
-        "interface",
-        "package",
-        "namespace",
-        "static",
-        "async",
-        "await",
-        "try",
-        "catch",
-        "throw",
-        "new",
-        "delete",
-        "this",
-        "self",
-        "super",
-        "for",
-        "while",
-        "do",
-        "switch",
-        "case",
-        "default",
-        "break",
-        "continue",
-        "in",
-        "of",
-        "as",
-        "is",
+        "if", "else", "let", "var", "const", "return", "public", "private", "protected",
+        "class", "function", "fn", "void", "int", "char", "string", "bool", "true", "false",
+        "import", "from", "use", "include", "struct", "impl", "type", "interface", "package",
+        "namespace", "static", "async", "await", "try", "catch", "throw", "new", "delete",
+        "this", "self", "super", "for", "while", "do", "switch", "case", "default", "break",
+        "continue", "in", "of", "as", "is",
     ]
     .iter()
     .cloned()
@@ -360,6 +268,12 @@ fn log_squeezer(input: &str) -> String {
     input.to_string()
 }
 
+struct Stats {
+    sum_comp: f64,
+    sum_acc: f64,
+    count: usize,
+}
+
 #[tokio::main]
 async fn main() {
     println!("🚀 UNIFIED PRODUCTION EVALUATION SUITE (v2026.1)");
@@ -367,11 +281,8 @@ async fn main() {
     let boring = BoringTable::new();
     let mut total_tests = 0;
     let mut passed_tests = 0;
-    println!(
-        "{:<15} | {:<25} | {:>8} | {:>8} | Result",
-        "Category", "Test Name", "InSize", "Comp %"
-    );
-    println!("{:-<85}", "");
+
+    let mut ext_stats: HashMap<String, Stats> = HashMap::new();
 
     let micro_json =
         fs::read_to_string("tests/fixtures/payloads/micro_tests.json").unwrap_or_default();
@@ -398,19 +309,11 @@ async fn main() {
                     / f64::from(tc.important_bits.len() as u32))
                     * 100.0
             };
-            let status = if acc >= 100.0 {
+            if acc >= 100.0 {
                 passed_tests += 1;
-                "\x1b[32mPASS\x1b[0m"
             } else {
-                "\x1b[31mFAIL\x1b[0m"
-            };
-            let in_size = tc.input.len();
-            let comp_percent = comp_ratio * 100.0;
-            let display_name = tc.name.chars().take(25).collect::<String>();
-            println!(
-                "{:<15} | {display_name:<25} | {in_size:>8} | {comp_percent:>7.1}% | {acc:.1}% {status}",
-                tc.category
-            );
+                println!("   ❌ FAILED: {} ({acc:.1}%) - Lost: {missed:?}", tc.name);
+            }
         }
     }
 
@@ -424,8 +327,17 @@ async fn main() {
             if path.extension().is_none_or(|ext| ext == "json") {
                 continue;
             }
+            let ext = path
+                .extension()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
             let name = path.file_name().unwrap().to_string_lossy().to_string();
             let original = fs::read_to_string(&path).unwrap_or_default();
+            if original.is_empty() {
+                continue;
+            }
+
             let is_sql = name.ends_with(".sql") || name.ends_with(".graphql");
             let needles = boring.extract_needles(&original, is_sql);
             total_tests += 1;
@@ -444,67 +356,45 @@ async fn main() {
                 (f64::from((needles.len() - missed.len()) as u32) / f64::from(needles.len() as u32))
                     * 100.0
             };
-            let status = if acc >= 100.0 {
+            if acc >= 100.0 {
                 passed_tests += 1;
-                "\x1b[32mPASS\x1b[0m"
             } else {
-                "\x1b[31mFAIL\x1b[0m"
-            };
-            let original_len = original.len();
-            let comp_percent = comp_ratio * 100.0;
-            println!(
-                "{:<15} | {name:<25} | {original_len:>8} | {comp_percent:>7.1}% | {acc:.1}% {status}",
-                "Poly-Clean"
-            );
-            if acc < 100.0 {
-                println!("   ↳ Lost: {missed:?}");
+                println!("   ❌ FAILED: {name} ({acc:.1}%) - Lost: {missed:?}");
             }
+
+            let s = ext_stats.entry(ext).or_insert(Stats {
+                sum_comp: 0.0,
+                sum_acc: 0.0,
+                count: 0,
+            });
+            s.sum_comp += comp_ratio;
+            s.sum_acc += acc;
+            s.count += 1;
+
             clean_needles.insert(name, needles);
         }
     }
 
-    let slop_dir = "tests/fixtures/payloads/slop";
-    if let Ok(entries) = fs::read_dir(slop_dir) {
-        for entry in entries.filter_map(|e| e.ok()) {
-            let path = entry.path();
-            let filename = path.file_name().unwrap().to_string_lossy().to_string();
-            let clean_filename = filename.replace(".slop", "");
-            if let Some(needles) = clean_needles.get(&clean_filename) {
-                total_tests += 1;
-                let original = fs::read_to_string(&path).unwrap_or_default();
-                let output = structural_extraction(&original);
-                let comp_ratio =
-                    1.0 - (f64::from(output.len() as u32) / f64::from(original.len() as u32));
-                let mut missed = Vec::new();
-                for n in needles {
-                    if !output.contains(n) {
-                        missed.push(n);
-                    }
-                }
-                let acc = if needles.is_empty() {
-                    100.0
-                } else {
-                    (f64::from((needles.len() - missed.len()) as u32)
-                        / f64::from(needles.len() as u32))
-                        * 100.0
-                };
-                let status = if acc >= 100.0 {
-                    passed_tests += 1;
-                    "\x1b[32mPASS\x1b[0m"
-                } else {
-                    "\x1b[31mFAIL\x1b[0m"
-                };
-                let original_len = original.len();
-                let comp_percent = comp_ratio * 100.0;
-                println!(
-                    "{:<15} | {filename:<25} | {original_len:>8} | {comp_percent:>7.1}% | {acc:.1}% {status}",
-                    "Poly-Slop"
-                );
-                if acc < 100.0 {
-                    println!("   ↳ Lost: {missed:?}");
-                }
-            }
-        }
+    println!("\n📊 PERFORMANCE BY FILETYPE");
+    println!("============================");
+    println!(
+        "{:<10} | {:>5} | {:>12} | {:>8}",
+        "Ext", "Files", "Avg Comp %", "Avg Acc %"
+    );
+    println!("{:-<45}", "");
+
+    let mut sorted_exts: Vec<_> = ext_stats.keys().collect();
+    sorted_exts.sort();
+
+    for ext in sorted_exts {
+        let s = &ext_stats[ext];
+        let avg_comp = (s.sum_comp / s.count as f64) * 100.0;
+        let avg_acc = s.sum_acc / s.count as f64;
+        println!(
+            "{:<10} | {:>5} | {:>11.1}% | {:>7.1}%",
+            ext, s.count, avg_comp, avg_acc
+        );
     }
+
     println!("\n📊 FINAL SUMMARY: {passed_tests}/{total_tests} total test cases passed.");
 }
