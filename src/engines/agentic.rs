@@ -7,10 +7,10 @@ use std::path::Path;
 use regex::Regex;
 use rusqlite::Connection;
 use walkdir::WalkDir;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::fs::File;
 
-fn flatten_toon(val: &serde_json::Value, out: &mut String, prefix: &str) {
+fn flatten_toon(val: &serde_json::Value, out: &mut Vec<String>, prefix: &str) {
     match val {
         serde_json::Value::Object(map) => {
             for (k, v) in map {
@@ -19,16 +19,16 @@ fn flatten_toon(val: &serde_json::Value, out: &mut String, prefix: &str) {
             }
         }
         serde_json::Value::Array(arr) => {
-            out.push_str(&format!("{prefix}[{}]: ", arr.len()));
-            for v in arr {
-                if v.is_string() || v.is_number() || v.is_boolean() {
-                    out.push_str(&format!("{} ", v.to_string().trim_matches('"')));
-                }
+            for (i, v) in arr.iter().enumerate() {
+                let new_prefix = format!("{prefix}[{i}]");
+                flatten_toon(v, out, &new_prefix);
             }
-            out.push('\n');
+        }
+        serde_json::Value::String(s) => {
+            out.push(format!("{prefix}: {s}"));
         }
         _ => {
-            out.push_str(&format!("{prefix}: {}\n", val.to_string().trim_matches('"')));
+            out.push(format!("{prefix}: {}", val));
         }
     }
 }
@@ -39,85 +39,99 @@ pub fn stream_toon(
     offset: usize,
     limit: usize,
 ) -> Result<String, std::io::Error> {
-    let file = File::open(file_path)?;
-    let reader = BufReader::new(file);
+    let mut raw_content = std::fs::read_to_string(file_path)?;
+    
+    // Remove BOM if present
+    if raw_content.starts_with('\u{feff}') {
+        raw_content = raw_content[3..].to_string();
+    }
+
+    let mut all_toon_lines = Vec::new();
+
+    // Strategy: Parse using serde_json::from_str for whole DOM flattening.
+    // If it fails (too deep), we fallback to line-by-line.
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw_content) {
+        flatten_toon(&value, &mut all_toon_lines, "root");
+    } else {
+        // Fallback: NDJSON
+        for line in raw_content.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() { continue; }
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(trimmed) {
+                flatten_toon(&val, &mut all_toon_lines, "node");
+            } else {
+                all_toon_lines.push(trimmed.to_string());
+            }
+        }
+    }
 
     let re = search_pattern.and_then(|p| Regex::new(p).ok());
-    let mut out = String::new();
     let mut match_count = 0;
     let mut lines_added = 0;
     let mut has_more = false;
+    let mut candidates = Vec::new();
 
-    for line_result in reader.lines() {
-        let line = match line_result {
-            Ok(l) => l,
-            Err(_) => continue,
+    for t_line in all_toon_lines {
+        let matches = match &re {
+            Some(regex) => regex.is_match(&t_line),
+            None => true,
         };
 
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-
-        // Try to parse as JSON
-        let parsed = serde_json::from_str::<serde_json::Value>(trimmed);
-        
-        let mut toon_str = String::new();
-        if let Ok(val) = parsed {
-            flatten_toon(&val, &mut toon_str, "");
-        } else {
-            toon_str = line;
-            toon_str.push('\n');
-        }
-
-        // Filter and Paginate
-        for t_line in toon_str.lines() {
-            let t_trimmed = t_line.trim();
-            if t_trimmed.is_empty() {
-                continue;
+        if matches {
+            if match_count >= offset {
+                if lines_added < limit {
+                    candidates.push(t_line);
+                    lines_added += 1;
+                } else {
+                    has_more = true;
+                    break;
+                }
             }
+            match_count += 1;
+        }
+    }
 
-            let matches = match &re {
-                Some(regex) => regex.is_match(t_trimmed),
-                None => true,
-            };
+    // --- OPTIMIZATION: Adaptive Breadcrumb Context (R-TOON) ---
+    let mut breadcrumb = String::new();
+    let mut final_lines = candidates;
 
-            if matches {
-                if match_count >= offset {
-                    if lines_added < limit {
-                        out.push_str(t_trimmed);
-                        out.push('\n');
-                        lines_added += 1;
-                    } else {
-                        has_more = true;
-                        break;
+    if !final_lines.is_empty() {
+        if let Some(first) = final_lines.first().cloned() {
+            let parts: Vec<&str> = first.split(':').collect();
+            if parts.len() > 1 {
+                let path_parts: Vec<&str> = parts[0].split('.').collect();
+                let mut common_path = Vec::new();
+                for i in 0..path_parts.len() {
+                    let current_test = path_parts[..=i].join(".");
+                    if final_lines.iter().all(|l| l.starts_with(&current_test)) {
+                        common_path.push(path_parts[i]);
+                    } else { break; }
+                }
+                if !common_path.is_empty() {
+                    breadcrumb = common_path.join(".");
+                    let strip_len = breadcrumb.len();
+                    for line in &mut final_lines {
+                        if line.starts_with(&breadcrumb) {
+                            *line = format!(".{}", &line[strip_len..]);
+                        }
+                    }
+                    if breadcrumb.len() > 200 {
+                        breadcrumb = format!("{}...{}", &breadcrumb[..50], &breadcrumb[breadcrumb.len()-50..]);
                     }
                 }
-                match_count += 1;
             }
         }
-        if has_more {
-            break;
-        }
     }
 
-    let header = format!(
-        "# ⚡ TOON STREAM [Matches Returned: {} | Offset: {} | Limit: {} | Has More: {}]\n---\n",
-        lines_added, offset, limit, if has_more { "TRUE" } else { "FALSE" }
-    );
-
-    let mut final_out = header;
-    if out.is_empty() {
-        final_out.push_str("(No matches found or EOF reached)\n");
-    } else {
-        final_out.push_str(&out);
-    }
-
-    if has_more {
-        final_out.push_str("\n--- [TRUNCATED: Use higher offset to see more results] ---\n");
-    }
-
-    Ok(final_out)
+    let header = format!("# ⚡ TOON STREAM [Matches: {} | Offset: {} | Limit: {} | Has More: {}]\n", 
+        lines_added, offset, limit, if has_more { "TRUE" } else { "FALSE" });
+    let mut out = header;
+    if !breadcrumb.is_empty() { out.push_str(&format!("# CONTEXT: {}\n", breadcrumb)); }
+    out.push_str("---\n");
+    if final_lines.is_empty() { out.push_str("(No matches found or EOF reached)\n"); }
+    else { for l in final_lines { out.push_str(&l); out.push('\n'); } }
+    if has_more { out.push_str("\n--- [TRUNCATED: Use higher offset to see more results] ---\n"); }
+    Ok(out)
 }
 
 /// Engine for architectural mapping and structural code extraction.
